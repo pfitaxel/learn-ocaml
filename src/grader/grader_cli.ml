@@ -67,12 +67,25 @@ let remove_trailing_slash s =
   let len = String.length s in
   if len <> 0 && s.[len-1] = '/' then String.sub s 0 (len-1) else s
 
+(* Begin EMD@2016-10-18 *)
+let read_file f =
+  let ic = open_in f in
+  let n = in_channel_length ic in
+  let s = Bytes.create n in
+  really_input ic s 0 n;
+  close_in ic;
+  Bytes.to_string s;;
+(* End EMD@2016-10-18 *)
+
 let grade exercise_dir output_json =
   Lwt.catch
     (fun () ->
        let exercise_dir = remove_trailing_slash exercise_dir in
        read_exercise exercise_dir >>= fun exo ->
-       let solution = Learnocaml_exercise.(get solution) exo in
+       (* let solution = Learnocaml_exercise.(get solution) exo in *)
+       (* Begin EMD@2016-10-18 *)
+       let solution = read_file (Filename.concat exercise_dir "student.ml") in
+       (* End EMD@2016-10-18 *)
        let callback =
          if !display_callback then Some (Printf.printf "[ %s ]\n%!") else None in
        Grading_cli.get_grade ?callback exo solution
