@@ -33,9 +33,18 @@ let display_outcomes = ref false
 (* Where to put the graded exercise *)
 let output_json = ref None
 
+(* Begin EMD@2016-10-30 *)
+(* Should the tool grade 'student.ml' instead of 'solution.ml' ? *)
+let grade_student = ref false
+(* End EMD@2016-10-30 *)
+
 let args = Arg.align @@
   [ "-output-json", Arg.String (fun s -> output_json := Some s),
     "PATH save the graded exercise in JSON format in the given file" ;
+    (* Begin EMD@2016-10-30 *)
+    "-grade-student", Arg.Set grade_student,
+    " grade file 'student.ml' instead of 'solution.ml'";
+    (* End EMD@2016-10-30 *)
     "-display-outcomes", Arg.Set display_outcomes,
     " display the toplevel's outcomes" ;
     "-display-progression", Arg.Set display_callback,
@@ -83,9 +92,11 @@ let grade exercise_dir output_json =
        let exercise_dir = remove_trailing_slash exercise_dir in
        read_exercise exercise_dir >>= fun exo ->
        (* let solution = Learnocaml_exercise.(get solution) exo in *)
-       (* Begin EMD@2016-10-18 *)
-       let solution = read_file (Filename.concat exercise_dir "student.ml") in
-       (* End EMD@2016-10-18 *)
+       (* Begin EMD@2016-10-18/30 *)
+       let solution = if !grade_student then
+                        read_file (Filename.concat exercise_dir "student.ml")
+                      else Learnocaml_exercise.(get solution) exo in
+       (* End EMD@2016-10-18/30 *)
        let callback =
          if !display_callback then Some (Printf.printf "[ %s ]\n%!") else None in
        Grading_cli.get_grade ?callback exo solution
