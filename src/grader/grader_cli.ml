@@ -38,6 +38,9 @@ let output_json = ref None
 let grade_student = ref false
 (* End EMD@2016-10-30 *)
 
+(* Should each test be run with a specific timeout (in secs) ? *)
+let individual_timeout = ref None
+
 let args = Arg.align @@
   [ "-output-json", Arg.String (fun s -> output_json := Some s),
     "PATH save the graded exercise in JSON format in the given file" ;
@@ -45,6 +48,8 @@ let args = Arg.align @@
     "-grade-student", Arg.Set grade_student,
     " grade file 'student.ml' instead of 'solution.ml'";
     (* End EMD@2016-10-30 *)
+    "-timeout", Arg.Int (fun i -> individual_timeout := Some i),
+    "INT run each test with the specified timeout (in secs)" ;
     "-display-outcomes", Arg.Set display_outcomes,
     " display the toplevel's outcomes" ;
     "-display-progression", Arg.Set display_callback,
@@ -99,7 +104,8 @@ let grade exercise_dir output_json =
        (* End EMD@2016-10-18/30 *)
        let callback =
          if !display_callback then Some (Printf.printf "[ %s ]\n%!") else None in
-       Grading_cli.get_grade ?callback exo solution
+       let timeout = !individual_timeout in
+       Grading_cli.get_grade ?callback ?timeout exo solution
        >>= fun (result, stdout_contents, stderr_contents, outcomes) ->
        match result with
        | Error exn ->
