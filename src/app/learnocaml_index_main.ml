@@ -633,6 +633,9 @@ let set_string_translations () =
     "txt_returning_password", [%i"Password"];
     "txt_login_returning",  [%i"Connect"];
     "txt_login_forgotten", [%i"Forgot your password?"];
+    "txt_first_connection_consent", [%i"By submitting this form, I accept that the \
+                                       information entered will be used in the \
+                                       context of the Pfitaxel plateform."];
   ] in
   List.iter
     (fun (id, text) ->
