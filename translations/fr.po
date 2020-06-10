@@ -492,6 +492,38 @@ msgstr ""
 msgid "Unexpected error:\n"
 msgstr "Erreur inattendue:\n"
 
+#: src/app/learnocaml_lti_main.ml:38,40--58
+#: src/app/learnocaml_index_main.ml:625,31--49
+msgid "First connection"
+msgstr "Première connexion"
+
+#: src/app/learnocaml_lti_main.ml:39,42--78
+msgid "Do you have a Learn OCaml account?"
+msgstr "Avez-vous un compte Learn OCaml ?"
+
+#: src/app/learnocaml_lti_main.ml:40,27--32
+msgid "Yes"
+msgstr "Oui"
+
+#: src/app/learnocaml_lti_main.ml:41,26--30
+msgid "No"
+msgstr "Non"
+
+#: src/app/learnocaml_lti_main.ml:42,32--50
+msgid "Enter your token"
+msgstr "Entrez votre token"
+
+#: src/app/learnocaml_lti_main.ml:43,38--45
+#: src/app/learnocaml_index_main.ml:629,37--44
+#: src/app/learnocaml_teacher_tab.ml:558,25--32
+msgid "Token"
+msgstr "Token"
+
+#: src/app/learnocaml_lti_main.ml:44,31--40
+#: src/app/learnocaml_index_main.ml:634,31--40
+msgid "Connect"
+msgstr "Se connecter"
+
 #: src/app/learnocaml_index_main.ml:64,18--37
 msgid "Loading exercises"
 msgstr "Chargement des exercices"
@@ -578,10 +610,6 @@ msgstr "Activités"
 msgid "Welcome to Learn OCaml"
 msgstr "Bienvenue sur Learn OCaml"
 
-#: src/app/learnocaml_index_main.ml:625,31--49
-msgid "First connection"
-msgstr "Première connexion"
-
 #: src/app/learnocaml_index_main.ml:626,40--59
 msgid "Choose a nickname"
 msgstr "Choisissez un identifiant"
@@ -594,11 +622,6 @@ msgstr "Mot de passe"
 #: src/app/learnocaml_index_main.ml:628,38--46
 msgid "Secret"
 msgstr "Secret"
-
-#: src/app/learnocaml_index_main.ml:629,37--44
-#: src/app/learnocaml_teacher_tab.ml:558,25--32
-msgid "Token"
-msgstr "Token"
 
 #: src/app/learnocaml_index_main.ml:630,24--42
 msgid "Create new token"
@@ -613,10 +636,6 @@ msgstr "Utilisateur existant"
 #: src/app/learnocaml_teacher_tab.ml:556,25--35
 msgid "Nickname"
 msgstr "Pseudonyme"
-
-#: src/app/learnocaml_index_main.ml:634,31--40
-msgid "Connect"
-msgstr "Se connecter"
 
 #: src/app/learnocaml_index_main.ml:635,30--53
 msgid "Forgot your password?"
@@ -950,9 +969,6 @@ msgstr "lors du chargement des dépendances"
 #: src/grader/grading.ml:189,38--67
 msgid "while testing your solution"
 msgstr "lors du test de la solution utilisateur"
-
-#~ msgid "Enter your token"
-#~ msgstr "Entrez votre token"
 
 #~ msgid "Failed to download archive. Please try again later!"
 #~ msgstr ""
