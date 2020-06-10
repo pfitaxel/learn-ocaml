@@ -6,6 +6,7 @@
  * included LICENSE file for details. *)
 
 open Js_utils
+open Learnocaml_data
 open Learnocaml_common
 
 let id s = s, find_component s
@@ -33,6 +34,7 @@ let init_dialogs () =
       true)
 
 let () =
+  (match Js_utils.get_lang () with Some l -> Ocplib_i18n.set_lang l | None -> ());
   init_dialogs ();
   set_string_translations [
       "txt_first_connection_dialog", [%i"First connection"];
