@@ -8,31 +8,63 @@ authors: [
   "Louis Gesbert (OCamlPro)"
   "Pierrick Couderc (OCamlPro)"
 ]
-maintainer: "Louis Gesbert"
+maintainer: "Yann Régis-Gianas"
 license: "MIT"
 homepage: "https://github.com/ocaml-sf/learn-ocaml"
 bug-reports: "https://github.com/ocaml-sf/learn-ocaml/issues"
 dev-repo: "git+https://github.com/ocaml-sf/learn-ocaml"
 depends: [
-  "base" {= "v0.9.4"}
-  "base64" {= "2.3.0"}
-  "cmdliner" {= "1.0.3"}
-  "cohttp" {= "1.1.1"}
-  "cohttp-lwt" {= "1.1.1"}
-  "cohttp-lwt-unix" {= "1.1.1"}
-  "conduit" {= "1.3.0"}
-  "conduit-lwt" {= "1.3.0"}
-  "conduit-lwt-unix" {= "1.3.0"}
+  "angstrom" {= "0.14.1"}
+  "asak" {= "0.2"}
+  "asn1-combinators" {= "0.2.2"}
+  "astring" {= "0.8.3"}
+  "base" {= "v0.11.1"}
+  "base-bigarray" {= "base"}
+  "base-bytes" {= "base"}
+  "base-num" {= "base"}
+  "base-threads" {= "base"}
+  "base-unix" {= "base"}
+  "base64" {= "3.4.0"}
+  "bigarray-compat" {= "1.0.0"}
+  "bigstringaf" {= "0.6.0"}
+  "biniou" {= "1.2.0"}
+  "checkseum" {= "0.0.3"}
+  "cmdliner" {= "1.0.4"}
+  "cohttp" {= "2.4.0"}
+  "cohttp-lwt" {= "2.4.0"}
+  "cohttp-lwt-unix" {= "2.4.0"}
+  "colombe" {= "0.3.0"}
+  "conduit" {= "2.0.2"}
+  "conduit-lwt" {= "2.0.2"}
+  "conduit-lwt-unix" {= "2.0.2"}
   "conf-git" {= "1.0"}
-  "conf-libev" {= "4-11"}
-  "conf-openssl" {= "1"}
-  "cstruct" {= "3.3.0"}
+  "conf-gmp" {= "1"}
+  "conf-libssl" {= "1"}
+  "conf-m4" {= "1"}
+  "conf-perl" {= "1"}
+  "conf-pkg-config" {= "1.1"}
+  "conf-which" {= "1"}
+  "cppo" {= "1.6.6"}
+  "cpuid" {= "0.1.2"}
+  "cstruct" {= "5.0.0"}
+  "cstruct-lwt" {= "5.0.0"}
+  "cstruct-sexp" {= "5.0.0"}
   "decompress" {= "0.8.1"}
   "digestif" {= "0.7.1"}
-  "dune" {= "1.6.3"}
+  "domain-name" {= "0.3.0"}
+  "dune" {= "2.2.0"}
+  "dune-configurator" {= "1.11.4"}
   "easy-format" {= "1.3.1"}
-  "ezjsonm" {= "0.6.0"}
-  "ipaddr" {= "2.8.0"}
+  "eqaf" {= "0.6"}
+  "ezjsonm" {= "1.1.0"}
+  "fieldslib" {= "v0.11.0"}
+  "fmt" {= "0.8.8"}
+  "fpath" {= "0.7.2"}
+  "gmap" {= "0.3.0"}
+  "hex" {= "1.4.0"}
+  "ipaddr" {= "5.0.0"}
+  "ipaddr-sexp" {= "5.0.0"}
+  "jbuilder" {= "1.0+beta20.2"}
   "js_of_ocaml" {= "3.3.0"}
   "js_of_ocaml-compiler" {= "3.3.0"}
   "js_of_ocaml-lwt" {= "3.3.0"}
@@ -40,33 +72,74 @@ depends: [
   "js_of_ocaml-toplevel" {= "3.3.0"}
   "js_of_ocaml-tyxml" {= "3.3.0"}
   "jsonm" {= "1.0.1"}
-  "lwt" {= "3.3.0"}
-  "lwt_react" {= "1.1.1"}
-  "lwt_ssl" {= "1.1.2"}
-  "magic-mime" {= "1.1.1"}
-  "markup" {= "0.8.0"}
+  "logs" {= "0.7.0"}
+  "lwt" {= "4.2.1"}
+  "lwt_react" {= "1.1.3"}
+  "lwt_ssl" {= "1.1.3"}
+  "macaddr" {= "5.0.0"}
+  "magic-mime" {= "1.1.2"}
+  "markup" {= "0.8.2"}
+  "mirage-no-solo5" {= "1"}
+  "mirage-no-xen" {= "1"}
+  "mmap" {= "1.1.0"}
+  "nocrypto" {= "0.5.4-2"}
+  "num" {= "0"}
   "ocaml" {= "4.05.0"}
-  "ocamlfind" {= "1.8.0"}
-  "ocp-indent-nlfork" {= "1.5.3"}
+  "ocaml-compiler-libs" {= "v0.12.1"}
+  "ocaml-migrate-parsetree" {= "1.3.1"}
+  "ocaml-secondary-compiler" {= "4.08.1-1"}
+  "ocaml-syntax-shims" {= "1.0.0"}
+  "ocamlbuild" {= "0.14.0"}
+  "ocamlfind" {= "1.8.1"}
+  "ocamlfind-secondary" {= "1.8.1"}
+  "ocb-stubblr" {= "0.1.1-1"}
+  "ocp-indent-nlfork" {= "1.5.4"}
   "ocp-ocamlres" {= "0.4"}
+  "ocplib-endian" {= "1.1"}
   "ocplib-json-typed" {= "0.6"}
-  "odoc" {= "1.3.0"}
+  "odoc" {= "1.5.1"}
   "omd" {= "1.3.1"}
-  "pprint" {= "20180528"}
-  "ppx_cstruct" {= "3.3.0"}
+  "optint" {= "0.0.2"}
+  "parsexp" {= "v0.11.0"}
+  "pprint" {= "20200316"}
+  "ppx_cstruct" {= "5.0.0"}
+  "ppx_derivers" {= "1.2.1"}
+  "ppx_deriving" {= "4.5"}
+  "ppx_fields_conv" {= "v0.11.0"}
+  "ppx_sexp_conv" {= "v0.11.1"}
   "ppx_tools" {= "5.0+4.05.0"}
+  "ppx_tools_versioned" {= "5.2.2"}
+  "ppxfind" {= "1.3"}
+  "ppxlib" {= "0.2.2"}
+  "ptime" {= "0.8.5"}
+  "re" {= "1.9.0"}
   "react" {= "1.2.1"}
   "reactiveData" {= "0.2.1"}
-  "ssl" {= "0.5.7"}
-  "tyxml" {= "4.3.0"}
-  "uri" {= "1.9.7"}
-  "uutf" {= "1.0.1"}
-  "yojson" {= "1.5.0"}
-  "asak" {= "0.1"}
+  "result" {= "1.5"}
+  "rresult" {= "0.6.0"}
+  "sendmail" {= "0.3.0"}
+  "sendmail-lwt" {= "0.3.0"}
+  "seq" {= "0.2.2"}
+  "sexplib" {= "v0.11.0"}
+  "sexplib0" {= "v0.11.0"}
+  "ssl" {= "0.5.9"}
+  "stdio" {= "v0.11.0"}
+  "stdlib-shims" {= "0.1.0"}
+  "stringext" {= "1.6.0"}
+  "tls" {= "0.10.6"}
+  "topkg" {= "1.0.1"}
+  "tyxml" {= "4.4.0"}
+  "uchar" {= "0.0.2"}
+  "uri" {= "3.1.0"}
+  "uri-sexp" {= "3.1.0"}
+  "uutf" {= "1.0.2"}
+  "x509" {= "0.9.0"}
+  "yojson" {= "1.7.0"}
+  "zarith" {= "1.9.1"}
 ]
 build: [
   [make "static"]
-  ["dune" "build" "-p" name]
+  ["dune" "build" "-p" name "-j" jobs]
 ]
 install: [
   ["mkdir" "-p" "%{_:share}%"]

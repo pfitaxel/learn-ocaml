@@ -16,6 +16,7 @@
  (modules Learnocaml_tutorial_parser)
  (libraries learnocaml_repository
             learnocaml_data
+            lwt.unix
             markup
             omd)
 )
