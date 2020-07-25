@@ -7,7 +7,7 @@
             ezjsonm
             lwt.unix
             lwt_utils
-            cohttp.lwt
+            cohttp-lwt-unix
             magic-mime
 	    sha
             checkseum.c
@@ -16,5 +16,6 @@
             learnocaml_data
             learnocaml_api
             learnocaml_store
+	    learnocaml_sendmail
 	    learnocaml_partition_create)
 )
