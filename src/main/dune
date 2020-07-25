@@ -33,7 +33,7 @@
  	    sha
             lwt.unix
             lwt_utils
-            cohttp.lwt
+            cohttp-lwt-unix
             grading_cli
             learnocaml_data
 	    learnocaml_store
