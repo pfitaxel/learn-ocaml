@@ -1,5 +1,5 @@
 opam-version: "2.0"
-name: "learn-ocaml"
+name: "learn-ocaml-client"
 version: "0.12"
 authors: [
   "Benjamin Canou (OCamlPro)"
@@ -14,7 +14,6 @@ homepage: "https://github.com/ocaml-sf/learn-ocaml"
 bug-reports: "https://github.com/ocaml-sf/learn-ocaml/issues"
 dev-repo: "git+https://github.com/ocaml-sf/learn-ocaml"
 depends: [
-  "angstrom" {= "0.14.1"}
   "asak" {= "0.2"}
   "asn1-combinators" {= "0.2.2"}
   "astring" {= "0.8.4"}
@@ -26,18 +25,14 @@ depends: [
   "base-unix" {= "base"}
   "base64" {= "3.4.0"}
   "bigarray-compat" {= "1.0.0"}
-  "bigstringaf" {= "0.6.0"}
   "biniou" {= "1.2.1"}
-  "checkseum" {= "0.1.0"}
   "cmdliner" {= "1.0.4"}
   "cohttp" {= "2.5.1"}
   "cohttp-lwt" {= "2.5.1"}
   "cohttp-lwt-unix" {= "2.5.1"}
-  "colombe" {= "0.3.0"}
   "conduit" {= "1.4.0"}
   "conduit-lwt" {= "1.4.0"}
   "conduit-lwt-unix" {= "1.4.0"}
-  "conf-git" {= "1.0"}
   "conf-gmp" {= "1"}
   "conf-libssl" {= "1"}
   "conf-m4" {= "1"}
@@ -49,7 +44,6 @@ depends: [
   "cstruct" {= "5.0.0"}
   "cstruct-lwt" {= "5.0.0"}
   "cstruct-sexp" {= "5.0.0"}
-  "decompress" {= "0.8.1"}
   "digestif" {= "0.8.0-1"}
   "domain-name" {= "0.3.0"}
   "dune" {= "2.0.1"}
@@ -59,24 +53,17 @@ depends: [
   "ezjsonm" {= "1.1.0"}
   "fieldslib" {= "v0.13.0"}
   "fmt" {= "0.8.8"}
-  "fpath" {= "0.7.2"}
   "gmap" {= "0.3.0"}
   "hex" {= "1.4.0"}
   "ipaddr" {= "3.1.0"}
   "js_of_ocaml" {= "3.3.0"}
   "js_of_ocaml-compiler" {= "3.3.0"}
-  "js_of_ocaml-lwt" {= "3.3.0"}
-  "js_of_ocaml-ppx" {= "3.3.0"}
-  "js_of_ocaml-toplevel" {= "3.3.0"}
-  "js_of_ocaml-tyxml" {= "3.3.0"}
   "jsonm" {= "1.0.1"}
   "logs" {= "0.7.0"}
   "lwt" {= "4.5.0"}
-  "lwt_react" {= "1.1.3"}
   "lwt_ssl" {= "1.1.3"}
   "macaddr" {= "3.1.0"}
   "magic-mime" {= "1.1.2"}
-  "markup" {= "0.8.2"}
   "mirage-no-solo5" {= "1"}
   "mirage-no-xen" {= "1"}
   "mmap" {= "1.1.0"}
@@ -86,7 +73,6 @@ depends: [
   "ocaml-compiler-libs" {= "v0.12.1"}
   "ocaml-migrate-parsetree" {= "1.7.3"}
   "ocaml-secondary-compiler" {= "4.08.1-1"}
-  "ocaml-syntax-shims" {= "1.0.0"}
   "ocamlbuild" {= "0.14.0"}
   "ocamlfind" {= "1.8.1"}
   "ocamlfind-secondary" {= "1.8.1"}
@@ -95,9 +81,7 @@ depends: [
   "ocp-ocamlres" {= "0.4"}
   "ocplib-endian" {= "1.1"}
   "ocplib-json-typed" {= "0.6"}
-  "odoc" {= "1.5.1"}
   "omd" {= "1.3.1"}
-  "optint" {= "0.0.2"}
   "parsexp" {= "v0.13.0"}
   "pprint" {= "20200410"}
   "ppx_cstruct" {= "5.0.0"}
@@ -111,12 +95,8 @@ depends: [
   "ppxlib" {= "0.13.0"}
   "ptime" {= "0.8.5"}
   "re" {= "1.9.0"}
-  "react" {= "1.2.1"}
-  "reactiveData" {= "0.2.1"}
   "result" {= "1.5"}
   "rresult" {= "0.6.0"}
-  "sendmail" {= "0.3.0"}
-  "sendmail-lwt" {= "0.3.0"}
   "seq" {= "0.2.2"}
   "sexplib" {= "v0.13.0"}
   "sexplib0" {= "v0.13.0"}
@@ -126,7 +106,6 @@ depends: [
   "stringext" {= "1.6.0"}
   "tls" {= "0.10.6"}
   "topkg" {= "1.0.1"}
-  "tyxml" {= "4.4.0"}
   "uchar" {= "0.0.2"}
   "uri" {= "3.1.0"}
   "uri-sexp" {= "3.1.0"}
@@ -136,15 +115,10 @@ depends: [
   "zarith" {= "1.9.1"}
 ]
 build: [
-  [make "static"]
-  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "build" "@install" "-p" name "-j" jobs]
 ]
-install: [
-  ["mkdir" "-p" "%{_:share}%"]
-  ["cp" "-r" "demo-repository" "%{_:share}%/repository"]
-]
-synopsis: "The learn-ocaml online platform (engine)"
+synopsis: "The learn-ocaml client"
 description: """
-This contains the binaries forming the engine for the learn-ocaml platform, and
-the common files. A demo exercise repository is also provided as example.
+This contains the binaries to interact with the learn-ocaml
+platform from the command line.
 """
