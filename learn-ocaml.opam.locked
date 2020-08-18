@@ -115,8 +115,6 @@ depends: [
   "reactiveData" {= "0.2.1"}
   "result" {= "1.5"}
   "rresult" {= "0.6.0"}
-  "sendmail" {= "0.3.0"}
-  "sendmail-lwt" {= "0.3.0"}
   "seq" {= "0.2.2"}
   "sexplib" {= "v0.13.0"}
   "sexplib0" {= "v0.13.0"}

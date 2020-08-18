@@ -48,7 +48,6 @@ depends: [
   "pprint"
   "ppx_cstruct"
   "ppx_tools"
-  "sendmail-lwt" {>= "0.3.0"}
   "uutf" {>= "1.0" }
   "yojson" {>= "1.4.0" }
   "asak" {>= "0.1"}
