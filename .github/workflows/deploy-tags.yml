@@ -22,7 +22,7 @@ jobs:
           labels: "org.opencontainers.image.version=${{ steps.tag.outputs.tag }}"
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          repository: ocamlsf/learn-ocaml
+          repository: pfitaxel/learn-ocaml
           tags: latest
           tag_with_ref: true
   push_client:
@@ -42,7 +42,7 @@ jobs:
           labels: "org.opencontainers.image.version=${{ steps.tag.outputs.tag }}"
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          repository: ocamlsf/learn-ocaml-client
+          repository: pfitaxel/learn-ocaml-client
           target: client
           tags: latest
           tag_with_ref: true

@@ -1,9 +1,9 @@
 # Note: you may want to update this file and deploy-tags.yml at once
-name: Publish dev (Docker image of master)
+name: Publish dev (Docker image of staging)
 on:
   push:
     branches:
-      - master
+      - staging
 jobs:
   push_server:
     name: Push learn-ocaml image to Docker Hub
@@ -16,11 +16,11 @@ jobs:
         with:
           always_pull: true
           add_git_labels: true
-          labels: "org.opencontainers.image.version=master"
+          labels: "org.opencontainers.image.version=staging"
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          repository: ocamlsf/learn-ocaml
-          tags: master
+          repository: pfitaxel/learn-ocaml
+          tags: staging
   push_client:
     name: Push learn-ocaml-client image to Docker Hub
     runs-on: ubuntu-latest
@@ -32,9 +32,9 @@ jobs:
         with:
           always_pull: true
           add_git_labels: true
-          labels: "org.opencontainers.image.version=master"
+          labels: "org.opencontainers.image.version=staging"
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          repository: ocamlsf/learn-ocaml-client
+          repository: pfitaxel/learn-ocaml-client
           target: client
-          tags: master
+          tags: staging
