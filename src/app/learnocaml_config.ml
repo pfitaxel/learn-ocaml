@@ -10,11 +10,14 @@ class type learnocaml_config = object
   method enableLessons: bool Js.optdef_prop
   method enableExercises: bool Js.optdef_prop
   method enableToplevel: bool Js.optdef_prop
+  method enablePasswd: bool Js.optdef_prop
+  method enableMoodle: bool Js.optdef_prop
   method enablePlayground: bool Js.optdef_prop
   method txtLoginWelcome: Js.js_string Js.t Js.optdef_prop
   method txtNickname: Js.js_string Js.t Js.optdef_prop
-  method root: Js.js_string Js.t Js.optdef_prop
+  method rootUrl: Js.js_string Js.t Js.optdef_prop
 end
 
 let config : learnocaml_config Js.t = Js.Unsafe.js_expr "learnocaml_config"
-let api_server = Js.(to_string (Optdef.get config##.root (fun () -> string "")))
+let api_server = Js.(to_string (Optdef.get config##.rootUrl (fun () -> string "")))
+let get_opt o = Js.Optdef.get o (fun () -> false)

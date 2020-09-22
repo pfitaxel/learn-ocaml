@@ -47,6 +47,15 @@ module Args = struct
       "Directory where the app should be generated for the $(i,build) command, \
        and from where it is served by the $(i,serve) command."
 
+  let root_url =
+    value & opt string "" &
+      info ["root-url"] ~docv:"ROOT_URL" ~env:(Arg.env_var "LEARNOCAML_ROOT_URL") ~doc:
+        "Set the root URL of the website. \
+         Should not end with a trailing slash. \
+         Mandatory when the site is not hosted in path '/', \
+         which typically occurs for static deployment, \
+         or when use_moodle=true."
+
   module Grader = struct
     let info = info ~docs:"GRADER OPTIONS"
 
@@ -180,11 +189,6 @@ module Args = struct
       value & opt int 1 & info ["jobs";"j"] ~docv:"INT" ~doc:
         "Number of building jobs to run in parallel"
 
-    let root =
-      value & opt string "" & info ["root"] ~docv:"ROOT" ~doc:
-        "Set the root of all documents.  Use only for static deployment.\
-         Should not end with a trailing slash."
-
     type t = {
       contents_dir: string;
       try_ocaml: bool option;
@@ -192,15 +196,15 @@ module Args = struct
       exercises: bool option;
       playground: bool option;
       toplevel: bool option;
-      root: string
+      root_url: string
     }
 
     let builder_conf =
       let apply
-        contents_dir try_ocaml lessons exercises playground toplevel root
-        = { contents_dir; try_ocaml; lessons; exercises; playground; toplevel; root }
+        contents_dir try_ocaml lessons exercises playground toplevel root_url
+        = { contents_dir; try_ocaml; lessons; exercises; playground; toplevel; root_url }
       in
-      Term.(const apply $contents_dir $try_ocaml $lessons $exercises $playground $toplevel $root)
+      Term.(const apply $contents_dir $try_ocaml $lessons $exercises $playground $toplevel $root_url)
 
     let repo_conf =
       let apply repo_dir exercises_filtered jobs =
@@ -241,16 +245,16 @@ module Args = struct
       { commands; app_dir; repo_dir; grader; builder; server }
     in
     Term.(const apply $commands $app_dir $repo_dir
-          $Grader.term $Builder.term $Server.term app_dir)
+          $Grader.term $Builder.term $Server.term app_dir root_url)
 end
 
 open Args
 
-let process_html_file orig_file dest_file root =
+let process_html_file orig_file dest_file root_url =
   let transform_tag e tag attrs attr =
     let attr_pair = ("", attr) in
     match List.assoc_opt attr_pair attrs with
-    | Some url -> `Start_element ((e, tag), (attr_pair, root ^ url) :: (List.remove_assoc attr_pair attrs))
+    | Some url -> `Start_element ((e, tag), (attr_pair, root_url ^ url) :: (List.remove_assoc attr_pair attrs))
     | None -> `Start_element ((e, tag), attrs) in
   Lwt_io.open_file ~mode:Lwt_io.Input orig_file >>= fun ofile ->
   Lwt_io.open_file ~mode:Lwt_io.Output dest_file >>= fun wfile ->
@@ -326,7 +330,7 @@ let main o =
        |> Lwt_stream.iter_s (fun file ->
               if Filename.extension file = ".html" then
                 process_html_file (o.builder.Builder.contents_dir/file)
-                  (o.app_dir/file) o.builder.Builder.root
+                  (o.app_dir/file) o.builder.Builder.root_url
               else
                 Lwt.return_unit) >>= fun () ->
        let if_enabled opt dir f = (match opt with
@@ -363,14 +367,18 @@ let main o =
               \  enableLessons: %b,\n\
               \  enableExercises: %b,\n\
               \  enableToplevel: %b,\n\
-              \  root: \"%s\"\n\
+              \  rootUrl: \"%s\",\n\
+              \  enablePasswd: %b,\n\
+              \  enableMoodle: %b\n\
                }\n"
               (tutorials_ret <> None)
               (playground_ret <> None)
               (lessons_ret <> None)
               (exercises_ret <> None)
               (o.builder.Builder.toplevel <> Some false)
-              o.builder.Builder.root >>= fun () ->
+              o.builder.Builder.root_url
+              preconfig.ServerData.use_passwd
+              preconfig.ServerData.use_moodle >>= fun () ->
        Lwt.return (tutorials_ret <> Some false && exercises_ret <> Some false)))
     else
       Lwt.return true
@@ -383,12 +391,14 @@ let main o =
           let open Server in
           ("--app-dir="^o.app_dir) ::
           ("--sync-dir="^o.server.sync_dir) ::
+          ("--root-url="^o.builder.Builder.root_url) ::
           ("--port="^string_of_int o.server.port) ::
           (match o.server.cert with None -> [] | Some c -> ["--cert="^c])
         in
         Unix.execv native_server (Array.of_list (native_server::server_args))
       else
-        Printf.printf "Starting server on port %d\n%!"
+      Printf.printf "ROOT_URL: \"%s\"\n%!" o.builder.Builder.root_url;
+      Printf.printf "Starting server on port %d\n%!"
           !Learnocaml_server.port;
       Learnocaml_server.launch ()
     else
