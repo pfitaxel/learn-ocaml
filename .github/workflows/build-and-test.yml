@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - 'learn-ocaml-editor-docker'
   pull_request:
     branches:
       - '**'

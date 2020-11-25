@@ -4,9 +4,10 @@ on:
   push:
     branches:
       - master
-  schedule:
-    # deploy master every Saturday at 08:00 UTC
-    - cron: '0 8 * * 6'
+      - 'learn-ocaml-editor-docker'
+  # schedule:
+  #   # deploy master every Saturday at 08:00 UTC
+  #   - cron: '0 8 * * 6'
 jobs:
   push_server:
     name: Push learn-ocaml image to Docker Hub
@@ -19,25 +20,25 @@ jobs:
         with:
           always_pull: true
           add_git_labels: true
-          labels: "org.opencontainers.image.version=master"
+          labels: "org.opencontainers.image.version=learn-ocaml-editor-docker"
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          repository: ocamlsf/learn-ocaml
-          tags: master
-  push_client:
-    name: Push learn-ocaml-client image to Docker Hub
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2
-      - name: Push to Docker Hub
-        uses: docker/build-push-action@v1
-        with:
-          always_pull: true
-          add_git_labels: true
-          labels: "org.opencontainers.image.version=master"
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-          repository: ocamlsf/learn-ocaml-client
-          target: client
-          tags: master
+          repository: pfitaxel/staging-learn-ocaml-editor
+          tags: learn-ocaml-editor-docker
+# push_client:
+#   name: Push learn-ocaml-client image to Docker Hub
+#   runs-on: ubuntu-latest
+#   steps:
+#     - name: Check out the repo
+#       uses: actions/checkout@v2
+#     - name: Push to Docker Hub
+#       uses: docker/build-push-action@v1
+#       with:
+#         always_pull: true
+#         add_git_labels: true
+#         labels: "org.opencontainers.image.version=learn-ocaml-editor-docker"
+#         username: ${{ secrets.DOCKER_USERNAME }}
+#         password: ${{ secrets.DOCKER_PASSWORD }}
+#         repository: pfitaxel/staging-learn-ocaml-editor-client
+#         target: client
+#         tags: learn-ocaml-editor-docker
