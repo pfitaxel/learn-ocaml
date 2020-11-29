@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - 'fix-static-deploy-docker'
 jobs:
   push_server:
     name: Push learn-ocaml image to Docker Hub
@@ -16,25 +17,27 @@ jobs:
         with:
           always_pull: true
           add_git_labels: true
-          labels: "org.opencontainers.image.version=master"
+          labels: "org.opencontainers.image.version=fix-static-deploy-docker"
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          repository: ocamlsf/learn-ocaml
-          tags: master
-  push_client:
-    name: Push learn-ocaml-client image to Docker Hub
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2
-      - name: Push to Docker Hub
-        uses: docker/build-push-action@v1
-        with:
-          always_pull: true
-          add_git_labels: true
-          labels: "org.opencontainers.image.version=master"
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-          repository: ocamlsf/learn-ocaml-client
-          target: client
-          tags: master
+          # repository: ocamlsf/learn-ocaml
+          repository: pfitaxel/staging-learn-ocaml-editor
+          # tags: master
+          tags: fix-static-deploy-docker
+# push_client:
+#   name: Push learn-ocaml-client image to Docker Hub
+#   runs-on: ubuntu-latest
+#   steps:
+#     - name: Check out the repo
+#       uses: actions/checkout@v2
+#     - name: Push to Docker Hub
+#       uses: docker/build-push-action@v1
+#       with:
+#         always_pull: true
+#         add_git_labels: true
+#         labels: "org.opencontainers.image.version=master"
+#         username: ${{ secrets.DOCKER_USERNAME }}
+#         password: ${{ secrets.DOCKER_PASSWORD }}
+#         repository: ocamlsf/learn-ocaml-client
+#         target: client
+#         tags: master
