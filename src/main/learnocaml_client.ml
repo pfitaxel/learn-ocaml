@@ -755,7 +755,7 @@ module Init_user = struct
                           and one non-alphanumeric char."
          else
            get_nonce_and_create_user server email password nickname secret >>= fun () ->
-           Printf.eprintf "A confirmation e-mail has been sent to your address.";
+           Printf.eprintf "A confirmation e-mail has been sent to your address.\nPlease go to your mailbox to finish creating your account,\n then you will be able to sign in.\n";
            Lwt.return 0
        | _ ->
           Lwt.fail_with "You must provide an e-mail address, a password, a nickname and a secret."
