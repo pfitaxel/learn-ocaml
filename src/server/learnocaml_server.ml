@@ -954,8 +954,10 @@ module Request_handler = struct
       | Api.Upgrade _ ->
          lwt_fail (`Forbidden, "Users with passwords are disabled on this instance.")
 
+      | Api.Server_config _ when config.ServerData.use_passwd ->
+         respond_json cache true
       | Api.Server_config _ ->
-         lwt_fail (`Forbidden, "pas encore fait")
+         respond_json cache false
       | Api.Invalid_request body ->
           lwt_fail (`Bad_request, body)
 

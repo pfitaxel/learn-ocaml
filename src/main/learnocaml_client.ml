@@ -1092,22 +1092,21 @@ end
 module Server_config = struct
   let doc = "Get a structured json containing an information about the use_password compatibility"
 
-  let server_config o = (*get_config_o ~allow_static:true o
-    >>= fun {ConfigFile.server;token} ->
-    fetch server (Learnocaml_api.Server_config)
-    >>= (fun index->
+  let server_config o = get_config_o ~allow_static:true o
+    >>= fun {ConfigFile.server;_} ->
+    fetch server (Learnocaml_api.Server_config ())
+    >>= (fun isPassword->
     let open Json_encoding in
-    let ezjsonm = (Json_encoding.construct
-                  (tup2 Exercise.Index.enc (assoc float))
-                  index)
+    let ezjsonm = (Json_encoding.construct  bool
+                  isPassword)
     in
     let json =
            match ezjsonm with
            | `O _ | `A _ as json -> json
            | _ -> assert false
     in
-    Ezjsonm.to_channel ~minify:false stdout json;*)
-    Lwt.return 0(**) 
+    Ezjsonm.to_channel ~minify:false stdout json;
+    Lwt.return 0;)
 
   let man = man doc
 
