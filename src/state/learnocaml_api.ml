@@ -115,6 +115,9 @@ type _ request =
   | Server_config:
       unit -> bool request
 
+  | Return:
+      string -> string request
+
   | Invalid_request:
       string -> string request
 
@@ -220,6 +223,8 @@ module Conversions (Json: JSON_CODEC) = struct
       | Upgrade _ -> str
 
       | Server_config () -> json J.bool
+
+      | Return _ -> str
 
       | Invalid_request _ ->
           str
@@ -371,6 +376,9 @@ module Conversions (Json: JSON_CODEC) = struct
 
     | Server_config () ->
        get ["get_server_config"]
+
+    | Return _ ->
+       assert false (* Reserved for a link *)
 
     | Invalid_request s ->
         failwith ("Error request "^s)
@@ -558,6 +566,9 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
 
       | `GET, ["get_server_config"], _ ->
          Server_config () |> k
+
+      | `POST body, ["do_return"], _ ->
+         Return body |> k
 
       | `GET, ["teacher"; "exercise-status.json"], Some token
         when Token.is_teacher token ->

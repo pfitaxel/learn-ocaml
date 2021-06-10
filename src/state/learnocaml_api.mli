@@ -129,6 +129,9 @@ type _ request =
   | Server_config:
       unit -> bool request
 
+  | Return:
+      string -> string request
+
   | Invalid_request:
       string -> string request
     (** Only for server-side handling: bound to requests not matching any case

@@ -958,6 +958,12 @@ module Request_handler = struct
          respond_json cache true
       | Api.Server_config _ ->
          respond_json cache false
+
+      | Api.Return _ ->
+         let make_cookie = Cohttp.Cookie.Set_cookie_hdr.make
+                             ~expiration:(`Max_age (Int64.of_int 60)) ~path:"/" in
+         let cookies = [make_cookie ~http_only:true ("csrf", "expired")] in
+         lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
       | Api.Invalid_request body ->
           lwt_fail (`Bad_request, body)
 
