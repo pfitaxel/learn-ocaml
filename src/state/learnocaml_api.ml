@@ -113,7 +113,7 @@ type _ request =
   | Upgrade:
       string -> string request
   | Server_config:
-      unit -> bool request
+      unit -> (string * bool) request
 
   | Return:
       string -> string request
@@ -222,7 +222,7 @@ module Conversions (Json: JSON_CODEC) = struct
       | Upgrade_form _ -> str
       | Upgrade _ -> str
 
-      | Server_config () -> json J.bool
+      | Server_config () -> json J.(obj2 (req "use_passwd" string) (req "compatibility" bool))
 
       | Return _ -> str
 

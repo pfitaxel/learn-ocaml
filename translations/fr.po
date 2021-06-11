@@ -1236,6 +1236,19 @@ msgstr "lors du chargement des dépendances"
 msgid "while testing your solution"
 msgstr "lors du test de la solution utilisateur"
 
+#: src/app/learnocaml_lti_main.ml:113,19--71
+#: src/app/learnocaml_upgrade_main.ml:76,17--69
+msgid "The password and its confirmation are not the same"
+msgstr "Le mot de passe et sa confirmation ne sont pas identiques"
+
+#: src/app/learnocaml_upgrade_main.ml:118,48--66
+msgid "Confirm password"
+msgstr "Confirmer le mot de passe"
+
+#: src/app/learnocaml_upgrade_main.ml:120,28--36
+msgid "Return"
+msgstr "Retour"
+
 #~ msgid "Create account"
 #~ msgstr "Créer un compte"
 
@@ -1340,3 +1353,4 @@ msgstr "lors du test de la solution utilisateur"
 
 #~ msgid "This session has been closed. You can close this tab."
 #~ msgstr "La session a été fermée. Vous pouvez fermer cet onglet."
+

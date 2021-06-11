@@ -1097,7 +1097,7 @@ module Server_config = struct
     fetch server (Learnocaml_api.Server_config ())
     >>= (fun isPassword->
     let open Json_encoding in
-    let ezjsonm = (Json_encoding.construct  bool
+    let ezjsonm = (Json_encoding.construct  (tup2 string bool)
                   isPassword)
     in
     let json =
