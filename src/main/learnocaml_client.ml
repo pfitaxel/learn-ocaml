@@ -718,6 +718,33 @@ module Init = struct
       "init"
 end
 
+module Init_server = struct
+  open Args_global
+
+  let init_server global_args =
+    let path = if global_args.local then ConfigFile.local_path else ConfigFile.user_path in
+    let get_server () =
+      match global_args.server_url with
+      | None -> Lwt.fail_with "You must provide a server."
+      | Some s -> Lwt.return s
+    in
+    get_server () >>= fun server ->
+    let config = { ConfigFile. server; token=None } in
+    ConfigFile.write path config >|= fun () ->
+    Printf.eprintf "Configuration written to %s.\n%!" path;
+    0
+
+  let man = man "Initialize the configuration file with the server"
+
+  let cmd =
+    Term.(
+      const (fun go -> Pervasives.exit (Lwt_main.run (init_server go)))
+      $ Args_global.term),
+    Term.info ~man
+      ~doc:"Initialize the configuration file."
+      "init-server"
+end
+
 module Init_user = struct
   open Args_global
   open Args_create_user
@@ -1130,6 +1157,7 @@ let () =
   match Term.eval_choice ~catch:false Main.cmd
           [ Init.cmd
           ; Init_user.cmd
+          ; Init_server.cmd
           ; Grade.cmd
           ; Print_token.cmd
           ; Set_options.cmd
