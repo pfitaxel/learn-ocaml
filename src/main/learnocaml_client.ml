@@ -28,7 +28,7 @@ let url_conv =
       Uri.pp_hum
     )
 
-let token_conv =
+  let token_conv =
   conv ~docv:"TOKEN" (
       (fun s ->
         try Ok (Token.parse s)
@@ -745,6 +745,30 @@ module Init_server = struct
       "init-server"
 end
 
+module Logout = struct
+  open Args_global
+
+  let logout global_args =
+    let path = if global_args.local then ConfigFile.local_path else ConfigFile.user_path in
+    let get_server () = Lwt.return Uri.empty
+    in
+    get_server () >>= fun server ->
+    let config = { ConfigFile. server; token=None } in
+    ConfigFile.write path config >|= fun () ->
+    Printf.eprintf "Configuration delete to %s.\n%!" path;
+    0
+
+  let man = man "delete current configuration file."
+
+  let cmd =
+    Term.(
+      const (fun go -> Pervasives.exit (Lwt_main.run (logout go)))
+      $ Args_global.term),
+    Term.info ~man
+      ~doc:"delete current configuration file."
+      "logout"
+end
+
 module Init_user = struct
   open Args_global
   open Args_create_user
@@ -1158,6 +1182,7 @@ let () =
           [ Init.cmd
           ; Init_user.cmd
           ; Init_server.cmd
+          ; Logout.cmd
           ; Grade.cmd
           ; Print_token.cmd
           ; Set_options.cmd
