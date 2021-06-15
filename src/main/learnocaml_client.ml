@@ -1166,6 +1166,18 @@ module Server_config = struct
     Term.info ~man ~doc:doc "server-config"
 end
 
+module Exercise_score = struct
+  let doc = "Get informations about scores of exercises"
+
+  let exercise_score _ = Lwt.return 0
+
+  let man = man doc
+
+  let cmd =
+    use_global exercise_score,
+    Term.info ~man ~doc:doc "exercise-score"
+end
+
 module Main = struct
   let man =
     man
@@ -1180,6 +1192,7 @@ end
 let () =
   match Term.eval_choice ~catch:false Main.cmd
           [ Init.cmd
+          ; Exercise_score.cmd
           ; Init_user.cmd
           ; Init_server.cmd
           ; Logout.cmd
