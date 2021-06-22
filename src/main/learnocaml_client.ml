@@ -10,6 +10,8 @@ open Learnocaml_data
 open Lwt.Infix
 module Api = Learnocaml_api
 
+module ES = Exercise.Status
+
 open Cmdliner
 open Arg
 
@@ -36,6 +38,50 @@ let url_conv =
           Error (`Msg (Printf.sprintf "Invalid token %s: %s" s msg))),
       (fun fmt t -> Format.pp_print_string fmt (Token.to_string t))
     )
+
+module Args_server = struct
+  type t = {
+      server_url: Uri.t option;
+      local: bool;
+    }
+
+  let server_url =
+    value & opt (some url_conv) None &
+    info ["s";"server"] ~docv:"URL" ~doc:
+      "The URL of the learn-ocaml server."
+      ~env:(Term.env_info "LEARNOCAML_SERVER" ~doc:
+              "Sets the learn-ocaml server URL. Overridden by $(b,--server).")
+  let local =
+    value & flag & info ["local"] ~doc:
+      "Use a configuration file local to the current directory, rather \
+       than user-wide."
+
+  let apply server_url local =
+    {server_url; local}
+
+  let term =
+    Term.(const apply $server_url $local)
+
+  let term_server =
+    Term.(const (fun x -> x) $ server_url)
+end
+
+module Args_logout = struct
+  type t = {
+      local: bool;
+    }
+
+  let local =
+    value & flag & info ["local"] ~doc:
+      "Use a configuration file local to the current directory, rather \
+       than user-wide."
+
+  let apply local =
+    {local}
+
+  let term =
+    Term.(const apply $local)
+end
 
 module Args_global = struct
   type t = {
@@ -92,6 +138,8 @@ module Args_create_token = struct
 
   let term = Term.(const apply $ nickname $ secret)
 end
+
+
 
 module Args_create_user = struct
   type t = {
@@ -679,6 +727,37 @@ let get_config_o ?save_back ?(allow_static=false) o =
   let open Args_global in
   get_config ~local:o.local ?save_back ~allow_static o.server_url o.token
 
+let get_config_option_server ?local ?(save_back=false) ?(allow_static=false) server_opt =
+  match ConfigFile.path ?local () with
+  | Some f ->
+      ConfigFile.read f >>= fun c ->
+      let c = match server_opt with
+        | Some server -> { c with ConfigFile.server }
+        | None -> c
+      in
+      check_server_version ~allow_static c.ConfigFile.server
+      >>= fun _ ->
+      (
+        if save_back
+        then
+          ConfigFile.write f c >|= fun () ->
+          Printf.eprintf "Configuration written to %s\n%!" f
+        else
+          Lwt.return_unit
+      )
+      >|= fun () -> Some c
+  | None -> Lwt.return_none
+
+let get_config_server ?local ?(save_back=false) ?(allow_static=false) server_opt =
+  get_config_option_server ?local ~save_back ~allow_static server_opt
+  >>= function
+  | Some c -> Lwt.return c
+  | None -> Lwt.fail_with "No config file found. Please do `learn-ocaml-client init`"
+
+let get_config_o_server ?save_back ?(allow_static=false) o =
+  let open Args_server in
+  get_config_server ~local:o.local ?save_back ~allow_static o.server_url
+
 module Init = struct
   open Args_global
   open Args_create_token
@@ -723,12 +802,12 @@ module Init = struct
 end
 
 module Init_server = struct
-  open Args_global
+  open Args_server
 
-  let init_server global_args =
-    let path = if global_args.local then ConfigFile.local_path else ConfigFile.user_path in
+  let init_server server_args =
+    let path = if server_args.local then ConfigFile.local_path else ConfigFile.user_path in
     let get_server () =
-      match global_args.server_url with
+      match server_args.server_url with
       | None -> Lwt.fail_with "You must provide a server."
       | Some s -> Lwt.return s
     in
@@ -743,17 +822,17 @@ module Init_server = struct
   let cmd =
     Term.(
       const (fun go -> Pervasives.exit (Lwt_main.run (init_server go)))
-      $ Args_global.term),
+      $ Args_server.term),
     Term.info ~man
       ~doc:"Initialize the configuration file."
       "init-server"
 end
 
 module Logout = struct
-  open Args_global
+  open Args_logout
 
-  let logout global_args =
-    let path = if global_args.local then ConfigFile.local_path else ConfigFile.user_path in
+  let logout logout_args =
+    let path = if logout_args.local then ConfigFile.local_path else ConfigFile.user_path in
     let get_server () = Lwt.return Uri.empty
     in
     get_server () >>= fun server ->
@@ -767,7 +846,7 @@ module Logout = struct
   let cmd =
     Term.(
       const (fun go -> Pervasives.exit (Lwt_main.run (logout go)))
-      $ Args_global.term),
+      $ Args_logout.term),
     Term.info ~man
       ~doc:"delete current configuration file."
       "logout"
@@ -1145,9 +1224,11 @@ module Exercise_list = struct
 end
 
 module Server_config = struct
+  open Args_server
+
   let doc = "Get a structured json containing an information about the use_password compatibility"
 
-  let server_config o = get_config_o ~allow_static:true o
+  let server_config o = get_config_o_server ~allow_static:true o
     >>= fun {ConfigFile.server;_} ->
     fetch server (Learnocaml_api.Server_config ())
     >>= (fun isPassword->
@@ -1166,12 +1247,24 @@ module Server_config = struct
   let man = man doc
 
   let cmd =
-    use_global server_config,
-    Term.info ~man ~doc:doc "server-config"
+    Term.(
+      const (fun go -> Pervasives.exit (Lwt_main.run (server_config go)))
+      $ Args_server.term),
+    Term.info ~man
+      ~doc:doc
+      "server-config"
 end
 
 module Exercise_score = struct
   let doc = "Get informations about scores of exercises"
+
+  let status_map = ref SMap.empty
+
+  let open_exercises =
+      SMap.fold (fun ex st acc ->
+          if ES.(st.assignments.default = Open) then ex::acc else acc)
+        !status_map []
+      |> List.rev
 
   let exercise_score _ = Lwt.return 0
 
