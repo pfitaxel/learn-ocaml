@@ -469,19 +469,23 @@ let fetch server_url req =
   let open Cohttp_lwt_unix in
   let do_req = function
     | { Learnocaml_api.meth = `GET; path; args; _ } ->
-        Client.get (url path args)
+       Client.get (url path args)
     | { Learnocaml_api.meth = `POST body; path; args; _ } ->
-        Client.post ~body:(Cohttp_lwt.Body.of_string body) (url path args)
+       Client.post ~body:(Cohttp_lwt.Body.of_string body) (url path args)
   in
   Api_client.make_request
     (fun http_request ->
-       do_req http_request >>= function
-       | {Response.status = `OK; _}, body ->
-           Cohttp_lwt.Body.to_string body >|= fun s -> Ok s
-       | {Response.status = `Not_found; _}, _ ->
-           Lwt.return (Error `Not_found)
-       | {Response.status; _}, _ ->
-           Lwt.return (Error (`Failure (Code.string_of_status status))))
+      do_req http_request >>= function
+      | {Response.status = `OK; _}, body ->
+         Cohttp_lwt.Body.to_string body >|= fun s -> Ok s
+      | {Response.status = `Not_found; _}, _ ->
+         Lwt.return (Error `Not_found)
+      | {Response.status = `Forbidden as status; _}, body ->
+         Cohttp_lwt.Body.to_string body >>= fun s ->
+         Lwt.return (Error (`Failure (Code.string_of_status status
+                                      ^ ": " ^ s)))
+      | {Response.status; _}, _ ->
+         Lwt.return (Error (`Failure (Code.string_of_status status))))
     req
   >>= function
   | Ok x -> Lwt.return x
