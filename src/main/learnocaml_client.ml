@@ -833,13 +833,12 @@ module Logout = struct
 
   let logout logout_args =
     let path = if logout_args.local then ConfigFile.local_path else ConfigFile.user_path in
-    let get_server () = Lwt.return Uri.empty
-    in
-    get_server () >>= fun server ->
-    let config = { ConfigFile. server; token=None } in
-    ConfigFile.write path config >|= fun () ->
-    Printf.eprintf "Configuration delete to %s.\n%!" path;
-    0
+    let rm path = if (Sys.file_exists path)
+                  then let () = Sys.remove path in
+                       Printf.eprintf "Configuration removed to %s.\n%!" path
+                  else Printf.eprintf "there is no file named %s.\n%!" path in
+    rm path;
+    Lwt.return 0
 
   let man = man "delete current configuration file."
 
@@ -1214,7 +1213,7 @@ module Exercise_list = struct
            | _ -> assert false
     in
     Ezjsonm.to_channel ~minify:false stdout json;
-    Lwt.return 0;)
+    Lwt.return 0)
 
   let man = man doc
 
@@ -1224,7 +1223,6 @@ module Exercise_list = struct
 end
 
 module Server_config = struct
-  open Args_server
 
   let doc = "Get a structured json containing an information about the use_password compatibility"
 
@@ -1233,16 +1231,11 @@ module Server_config = struct
     fetch server (Learnocaml_api.Server_config ())
     >>= (fun isPassword->
     let open Json_encoding in
-    let ezjsonm = (Json_encoding.construct  (tup2 string bool)
+    let ezjsonm = (Json_encoding.construct  bool
                   isPassword)
     in
-    let json =
-           match ezjsonm with
-           | `O _ | `A _ as json -> json
-           | _ -> assert false
-    in
-    Ezjsonm.to_channel ~minify:false stdout json;
-    Lwt.return 0;)
+    Ezjsonm.value_to_channel ~minify:false stdout ezjsonm;
+    Lwt.return 0)
 
   let man = man doc
 
@@ -1258,15 +1251,24 @@ end
 module Exercise_score = struct
   let doc = "Get informations about scores of exercises"
 
-  let status_map = ref SMap.empty
-
-  let open_exercises =
-      SMap.fold (fun ex st acc ->
-          if ES.(st.assignments.default = Open) then ex::acc else acc)
-        !status_map []
-      |> List.rev
-
-  let exercise_score _ = Lwt.return 0
+  let exercise_score o =
+    get_config_o ~allow_static:true o
+    >>= fun {ConfigFile.server;token} ->
+    match token with
+    |Some token -> fetch server (Learnocaml_api.Exercise_score token)
+                   >>= (fun scores->
+       let open Json_encoding in
+       let ezjsonm = (Json_encoding.construct  (assoc string)
+                        scores)
+       in
+       let json =
+         match ezjsonm with
+         | `O _ | `A _ as json -> json
+         | _ -> assert false
+       in
+       Ezjsonm.to_channel ~minify:false stdout json;
+       Lwt.return 0)
+    |None -> Lwt.fail_with "You must provide a token"
 
   let man = man doc
 

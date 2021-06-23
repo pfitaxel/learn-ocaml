@@ -955,9 +955,26 @@ module Request_handler = struct
          lwt_fail (`Forbidden, "Users with passwords are disabled on this instance.")
 
       | Api.Server_config _ when config.ServerData.use_passwd ->
-         respond_json cache ("use_passwd",true)
+         respond_json cache  true
       | Api.Server_config _ ->
-         respond_json cache ("use_passwd",false)
+         respond_json cache false
+
+      | Api.Exercise_score token ->
+         let get_results token =
+           Save.get token >|= fun save ->
+           let results = match save with
+             | Some save ->
+                  SMap.map
+                    (fun st -> Answer.(st.grade))
+                    save.Save.all_exercise_states
+             | _ -> SMap.empty
+           in
+           if SMap.is_empty results then
+             respond_json cache (("exercise1", "grade1")::("execise2", "grade2")::[])
+           else
+             respond_json cache (("exercise2", "grade2")::("execise1", "grade1")::[])
+         in
+         respond_json cache (("exercise2", "grade2")::("execise1", "grade1")::[])
 
       | Api.Return _ ->
          let make_cookie = Cohttp.Cookie.Set_cookie_hdr.make

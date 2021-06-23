@@ -127,7 +127,10 @@ type _ request =
       string -> string request
 
   | Server_config:
-      unit -> (string * bool) request
+      unit -> bool request
+
+  | Exercise_score:
+      Token.t -> (string * string) list request
 
   | Return:
       string -> string request

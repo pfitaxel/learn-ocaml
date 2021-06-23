@@ -113,7 +113,10 @@ type _ request =
   | Upgrade:
       string -> string request
   | Server_config:
-      unit -> (string * bool) request
+      unit -> bool request
+
+  | Exercise_score:
+      Token.t -> (string * string) list request
 
   | Return:
       string -> string request
@@ -222,7 +225,9 @@ module Conversions (Json: JSON_CODEC) = struct
       | Upgrade_form _ -> str
       | Upgrade _ -> str
 
-      | Server_config () -> json J.(obj2 (req "use_passwd" string) (req "compatibility" bool))
+      | Server_config () -> json J.(obj1 (req "use_passwd" bool))
+
+      | Exercise_score _ -> json (J.list J.(obj2 (req "exercise" string) (req "grade" string)))
 
       | Return _ -> str
 
@@ -375,7 +380,10 @@ module Conversions (Json: JSON_CODEC) = struct
        post ["do_upgrade"] body
 
     | Server_config () ->
-       get ["get_server_config"]
+       get ["server_config"]
+
+    | Exercise_score token ->
+       get ~token ["exercise_score"]
 
     | Return _ ->
        assert false (* Reserved for a link *)
@@ -564,8 +572,11 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
       | `POST body, ["do_upgrade"], _ ->
          Upgrade body |> k
 
-      | `GET, ["get_server_config"], _ ->
+      | `GET, ["server_config"], _ ->
          Server_config () |> k
+
+      | `GET , ["exercise_score"], Some token ->
+         Exercise_score token |> k
 
       | `POST body, ["do_return"], _ ->
          Return body |> k
