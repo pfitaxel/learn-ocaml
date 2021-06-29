@@ -955,9 +955,9 @@ module Request_handler = struct
          lwt_fail (`Forbidden, "Users with passwords are disabled on this instance.")
 
       | Api.Server_config _ when config.ServerData.use_passwd ->
-         respond_json cache  true
+         respond_json cache (("use_passwd", true)::[])
       | Api.Server_config _ ->
-         respond_json cache false
+         respond_json cache (("use_passwd", false)::[])
 
       | Api.Exercise_score token ->
          let get_results token =

@@ -1231,7 +1231,7 @@ module Server_config = struct
     fetch server (Learnocaml_api.Server_config ())
     >>= (fun isPassword->
     let open Json_encoding in
-    let ezjsonm = (Json_encoding.construct  bool
+    let ezjsonm = (Json_encoding.construct (assoc bool)
                   isPassword)
     in
     Ezjsonm.value_to_channel ~minify:false stdout ezjsonm;
