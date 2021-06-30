@@ -833,11 +833,13 @@ module Logout = struct
 
   let logout logout_args =
     let path = if logout_args.local then ConfigFile.local_path else ConfigFile.user_path in
-    let rm path = if (Sys.file_exists path)
-                  then let () = Sys.remove path in
-                       Printf.eprintf "Configuration removed to %s.\n%!" path
-                  else Printf.eprintf "there is no file named %s.\n%!" path in
-    rm path;
+    if (Sys.file_exists path)
+    then
+      begin
+        Sys.remove path;
+        Printf.eprintf "Configuration removed from %s.\n%!" path
+      end
+    else Printf.eprintf "Cannot remove %s : no such file or directory.\n%!" path;
     Lwt.return 0
 
   let man = man "delete current configuration file."
@@ -1261,12 +1263,7 @@ module Exercise_score = struct
        let ezjsonm = (Json_encoding.construct  (assoc string)
                         scores)
        in
-       let json =
-         match ezjsonm with
-         | `O _ | `A _ as json -> json
-         | _ -> assert false
-       in
-       Ezjsonm.to_channel ~minify:false stdout json;
+       Ezjsonm.value_to_channel ~minify:false stdout ezjsonm;
        Lwt.return 0)
     |None -> Lwt.fail_with "You must provide a token"
 

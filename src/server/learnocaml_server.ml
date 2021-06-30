@@ -340,12 +340,9 @@ module Request_handler = struct
                                   ~expiration:(`Max_age (Int64.of_int 60))
                                   ~path:"/"
                                   ("token", Token.to_string token)] in
-                 if (List.exists (fun a -> match a with
-                                           |("custom_exercise", _) -> true
-                                           |_ -> false) params)
-                    then let exercise = List.assoc "custom_exercise" params in
-                         lwt_ok @@ Redirect { code=`See_other; url="/exercises/"^exercise^"/#tab%3Dtext"; cookies }
-                 else lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
+                 match List.assoc_opt "custom_exercise" params with
+                 | Some exercise -> lwt_ok @@ Redirect { code=`See_other; url="/exercises/"^exercise^"/#tab%3Dtext"; cookies }
+                 | None -> lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
                else
                  Token_index.OauthIndex.get_current_secret !sync_dir >>= fun secret ->
                  let hmac = generate_hmac secret csrf_token id in
@@ -959,23 +956,36 @@ module Request_handler = struct
       | Api.Upgrade _ ->
          lwt_fail (`Forbidden, "Users with passwords are disabled on this instance.")
 
-      | Api.Server_config _ when config.ServerData.use_passwd ->
-         respond_json cache (("use_passwd", true)::[])
       | Api.Server_config _ ->
-         respond_json cache (("use_passwd", false)::[])
+         respond_json cache [("use_passwd", config.ServerData.use_passwd)]
 
       | Api.Exercise_score token ->
          Save.get token >>= fun save ->
+         Exercise.Index.get () >>= fun exercises ->
          let results = match save with
            | Some save ->
               SMap.map
                 (fun st -> Answer.(st.grade))
                 save.Save.all_exercise_states
            | _ -> SMap.empty in
+
+         let rec find_names exs = match exs with
+           | ((id,_)::tail) -> id::(find_names tail)
+           | _ -> [] in
+
+         let names = match exercises with
+           | Learnocaml_data.Exercise.Index.Groups exs -> find_names exs
+           | Learnocaml_data.Exercise.Index.Exercises exs -> find_names exs in
+
          if SMap.is_empty results then
-           respond_json cache (("exercise1", "grade1")::("execise2", "grade2")::[])
+           respond_json cache []
          else
-           respond_json cache (("exercise2", "grade2")::("execise1", "grade1")::[])
+           let rec grade_list exs = match exs with
+             | [] -> []
+             | ex_name::tail -> match SMap.find ex_name results with
+                                | Some grade -> (ex_name, string_of_int (grade))::(grade_list tail)
+                                | None -> (ex_name, "N/A")::(grade_list tail) in
+           respond_json cache (grade_list names)
 
       | Api.Return _ ->
          let make_cookie = Cohttp.Cookie.Set_cookie_hdr.make

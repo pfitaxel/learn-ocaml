@@ -227,7 +227,7 @@ module Conversions (Json: JSON_CODEC) = struct
 
       | Server_config () -> json J.(J.assoc J.bool)
 
-      | Exercise_score _ -> json (J.list J.(obj2 (req "exercise" string) (req "grade" string)))
+      | Exercise_score _ -> json J.(J.assoc J.string)
 
       | Return _ -> str
 
