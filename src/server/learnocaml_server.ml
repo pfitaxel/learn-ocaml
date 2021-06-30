@@ -340,7 +340,12 @@ module Request_handler = struct
                                   ~expiration:(`Max_age (Int64.of_int 60))
                                   ~path:"/"
                                   ("token", Token.to_string token)] in
-                 lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
+                 if (List.exists (fun a -> match a with
+                                           |("custom_exercise", _) -> true
+                                           |_ -> false) params)
+                    then let exercise = List.assoc "custom_exercise" params in
+                         lwt_ok @@ Redirect { code=`See_other; url="/exercises/"^exercise^"/#tab%3Dtext"; cookies }
+                 else lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
                else
                  Token_index.OauthIndex.get_current_secret !sync_dir >>= fun secret ->
                  let hmac = generate_hmac secret csrf_token id in
@@ -544,7 +549,7 @@ module Request_handler = struct
          (fun exn -> (`Internal_server_error, Printexc.to_string exn))
       | Api.Archive_zip token ->
           let open Lwt_process in
-          let path = Filename.concat !sync_dir (Token.to_path token) in 
+          let path = Filename.concat !sync_dir (Token.to_path token) in
           let cmd = shell ("git archive master --format=zip -0 --remote="^path)
           and stdout = `FD_copy Unix.stdout in
           Lwt_process.pread ~stdin:stdout cmd >>= fun contents ->
@@ -960,21 +965,17 @@ module Request_handler = struct
          respond_json cache (("use_passwd", false)::[])
 
       | Api.Exercise_score token ->
-         let get_results token =
-           Save.get token >|= fun save ->
-           let results = match save with
-             | Some save ->
-                  SMap.map
-                    (fun st -> Answer.(st.grade))
-                    save.Save.all_exercise_states
-             | _ -> SMap.empty
-           in
-           if SMap.is_empty results then
-             respond_json cache (("exercise1", "grade1")::("execise2", "grade2")::[])
-           else
-             respond_json cache (("exercise2", "grade2")::("execise1", "grade1")::[])
-         in
-         respond_json cache (("exercise2", "grade2")::("execise1", "grade1")::[])
+         Save.get token >>= fun save ->
+         let results = match save with
+           | Some save ->
+              SMap.map
+                (fun st -> Answer.(st.grade))
+                save.Save.all_exercise_states
+           | _ -> SMap.empty in
+         if SMap.is_empty results then
+           respond_json cache (("exercise1", "grade1")::("execise2", "grade2")::[])
+         else
+           respond_json cache (("exercise2", "grade2")::("execise1", "grade1")::[])
 
       | Api.Return _ ->
          let make_cookie = Cohttp.Cookie.Set_cookie_hdr.make
