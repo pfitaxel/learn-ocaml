@@ -1260,7 +1260,7 @@ module Exercise_score = struct
     |Some token -> fetch server (Learnocaml_api.Exercise_score token)
                    >>= (fun scores->
        let open Json_encoding in
-       let ezjsonm = (Json_encoding.construct  (assoc string)
+       let ezjsonm = (Json_encoding.construct  (assoc int)
                         scores)
        in
        Ezjsonm.value_to_channel ~minify:false stdout ezjsonm;

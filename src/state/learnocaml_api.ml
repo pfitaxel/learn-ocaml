@@ -116,7 +116,7 @@ type _ request =
       unit -> (string * bool) list request
 
   | Exercise_score:
-      Token.t -> (string * string) list request
+      Token.t -> (string * int) list request
 
   | Return:
       string -> string request
@@ -227,7 +227,7 @@ module Conversions (Json: JSON_CODEC) = struct
 
       | Server_config () -> json J.(J.assoc J.bool)
 
-      | Exercise_score _ -> json J.(J.assoc J.string)
+      | Exercise_score _ -> json J.(J.assoc J.int)
 
       | Return _ -> str
 

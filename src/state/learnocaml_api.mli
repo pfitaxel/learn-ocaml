@@ -130,7 +130,7 @@ type _ request =
       unit -> (string * bool) list request
 
   | Exercise_score:
-      Token.t -> (string * string) list request
+      Token.t -> (string * int) list request
 
   | Return:
       string -> string request

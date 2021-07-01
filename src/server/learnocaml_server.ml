@@ -969,22 +969,28 @@ module Request_handler = struct
                 save.Save.all_exercise_states
            | _ -> SMap.empty in
 
-         let rec find_names exs = match exs with
-           | ((id,_)::tail) -> id::(find_names tail)
-           | _ -> [] in
+         let find_exercises_names contents = match contents with
+           | Learnocaml_data.Exercise.Index.Groups _ -> failwith "erreur find_exercises_names"
+           | Learnocaml_data.Exercise.Index.Exercises exos -> List.map fst exos in
+
+         let rec find_names exs = List.map
+                                    (fun group -> find_exercises_names (snd group).Learnocaml_data.Exercise.Index.contents)
+                                    exs in
 
          let names = match exercises with
-           | Learnocaml_data.Exercise.Index.Groups exs -> find_names exs
-           | Learnocaml_data.Exercise.Index.Exercises exs -> find_names exs in
+           | Learnocaml_data.Exercise.Index.Groups exs -> List.concat (find_names exs)
+           | Learnocaml_data.Exercise.Index.Exercises _ -> [] in
 
          if SMap.is_empty results then
            respond_json cache []
          else
            let rec grade_list exs = match exs with
              | [] -> []
-             | ex_name::tail -> match SMap.find ex_name results with
-                                | Some grade -> (ex_name, string_of_int (grade))::(grade_list tail)
-                                | None -> (ex_name, "N/A")::(grade_list tail) in
+             | ex_name::tail -> if SMap.exists (fun key _ -> key = ex_name ) results
+                                then match SMap.find ex_name results with
+                                     | Some grade -> (ex_name, (*string_of_int*) grade)::(grade_list tail)
+                                     | None -> (*(ex_name, "N/A")::*)(grade_list tail)
+                                else (*(ex_name, "N/A")::*)(grade_list tail) in
            respond_json cache (grade_list names)
 
       | Api.Return _ ->
