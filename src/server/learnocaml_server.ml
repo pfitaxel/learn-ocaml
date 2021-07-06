@@ -341,7 +341,22 @@ module Request_handler = struct
                                   ~path:"/"
                                   ("token", Token.to_string token)] in
                  match List.assoc_opt "custom_exercise" params with
-                 | Some exercise -> lwt_ok @@ Redirect { code=`See_other; url="/exercises/"^exercise^"/#tab%3Dtext"; cookies }
+                 | Some exercise -> Exercise.Index.get () >>= fun exercises ->
+                                    let find_exercises_names contents = match contents with
+                                      | Learnocaml_data.Exercise.Index.Groups _ -> failwith "erreur find_exercises_names"
+                                      | Learnocaml_data.Exercise.Index.Exercises exos -> List.map fst exos in
+
+                                    let rec find_names exs = List.map
+                                                               (fun group -> find_exercises_names (snd group).Learnocaml_data.Exercise.Index.contents)
+                                                               exs in
+
+                                    let names = match exercises with
+                                      | Learnocaml_data.Exercise.Index.Groups exs -> List.concat (find_names exs)
+                                      | Learnocaml_data.Exercise.Index.Exercises _ -> [] in
+
+                                    if List.exists (fun name -> name = exercise) names
+                                    then lwt_ok @@ Redirect { code=`See_other; url="/exercises/"^exercise^"/#tab%3Dtext"; cookies }
+                                    else lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
                  | None -> lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
                else
                  Token_index.OauthIndex.get_current_secret !sync_dir >>= fun secret ->

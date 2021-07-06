@@ -66,7 +66,7 @@ module Args_server = struct
     Term.(const (fun x -> x) $ server_url)
 end
 
-module Args_logout = struct
+module Args_deinit = struct
   type t = {
       local: bool;
     }
@@ -829,10 +829,31 @@ module Init_server = struct
 end
 
 module Logout = struct
-  open Args_logout
+  open Args_deinit
 
   let logout logout_args =
     let path = if logout_args.local then ConfigFile.local_path else ConfigFile.user_path in
+    ConfigFile.read path >>= fun c ->
+    ConfigFile.write path { c with ConfigFile.token=None} >|= fun () ->
+    Printf.eprintf "Current token removed from %s.\n%!" path;
+    0
+
+  let man = man "Delete current token from configuration file"
+
+  let cmd =
+    Term.(
+      const (fun go -> Pervasives.exit (Lwt_main.run (logout go)))
+      $ Args_deinit.term),
+    Term.info ~man
+      ~doc:"Delete current token from configuration file."
+      "logout"
+end
+
+module Deinit = struct
+  open Args_deinit
+
+  let deinit deinit_args =
+    let path = if deinit_args.local then ConfigFile.local_path else ConfigFile.user_path in
     if (Sys.file_exists path)
     then
       begin
@@ -846,11 +867,11 @@ module Logout = struct
 
   let cmd =
     Term.(
-      const (fun go -> Pervasives.exit (Lwt_main.run (logout go)))
-      $ Args_logout.term),
+      const (fun go -> Pervasives.exit (Lwt_main.run (deinit go)))
+      $ Args_deinit.term),
     Term.info ~man
       ~doc:"delete current configuration file."
-      "logout"
+      "deinit"
 end
 
 module Init_user = struct
@@ -1292,6 +1313,7 @@ let () =
           ; Init_user.cmd
           ; Init_server.cmd
           ; Logout.cmd
+          ; Deinit.cmd
           ; Grade.cmd
           ; Print_token.cmd
           ; Set_options.cmd
