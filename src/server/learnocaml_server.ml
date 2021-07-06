@@ -355,9 +355,9 @@ module Request_handler = struct
                                       | Learnocaml_data.Exercise.Index.Exercises _ -> [] in
 
                                     if List.exists (fun name -> name = exercise) names
-                                    then lwt_ok @@ Redirect { code=`See_other; url="/exercises/"^exercise^"/#tab%3Dtext"; cookies }
-                                    else lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
-                 | None -> lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
+                                    then lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/exercises/"^exercise^"/#tab%3Dtext"; cookies }
+                                    else lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/"; cookies }
+                 | None -> lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/"; cookies }
                else
                  Token_index.OauthIndex.get_current_secret !sync_dir >>= fun secret ->
                  let hmac = generate_hmac secret csrf_token id in
