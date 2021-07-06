@@ -877,6 +877,7 @@ end
 module Init_user = struct
   open Args_global
   open Args_create_user
+  open ConfigFile
 
   let init global_args create_user_args =
     let path = if global_args.local then ConfigFile.local_path else ConfigFile.user_path in
@@ -888,7 +889,10 @@ module Init_user = struct
     in
     let get_server () =
       match global_args.server_url with
-      | None -> Lwt.fail_with "You must provide a server."
+      | None -> ConfigFile.read path >>= fun c ->
+                if c.server = Uri.empty
+                then Lwt.fail_with "You must provide a server with init-server."
+                else Lwt.return c.server
       | Some s -> Lwt.return s
     in
     get_server () >>= fun server ->
