@@ -14,7 +14,7 @@ type _ request =
   | Static:
       string list -> string request
   | Version:
-      unit -> (string * int) request
+      unit -> (string * int * bool) request
   | Nonce:
       unit -> string request
   | Create_token:
@@ -112,8 +112,6 @@ type _ request =
       string -> string request
   | Upgrade:
       string -> string request
-  | Server_config:
-      unit -> (string * bool) list request
 
   | Exercise_score:
       Token.t -> (string * int) list request
@@ -153,7 +151,7 @@ module Conversions (Json: JSON_CODEC) = struct
       in
       match req with
       | Static _ -> str
-      | Version _ -> json J.(obj2 (req "version" string) (req "server_id" int))
+      | Version _ -> json J.(obj3 (req "version" string) (req "server_id" int) (req "use_passwd" bool))
       | Nonce _ -> json J.(obj1 (req "nonce" string))
       | Create_token _ ->
           json J.(obj1 (req "token" string)) +>
@@ -224,8 +222,6 @@ module Conversions (Json: JSON_CODEC) = struct
 
       | Upgrade_form _ -> str
       | Upgrade _ -> str
-
-      | Server_config () -> json J.(J.assoc J.bool)
 
       | Exercise_score _ -> json J.(J.assoc J.int)
 
@@ -378,9 +374,6 @@ module Conversions (Json: JSON_CODEC) = struct
         assert false (* Reserved for a link *)
     | Upgrade body ->
        post ["do_upgrade"] body
-
-    | Server_config () ->
-       get ["server_config"]
 
     | Exercise_score token ->
        get ~token ["exercise_score"]
@@ -571,10 +564,7 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
           Upgrade_form body |> k
       | `POST body, ["do_upgrade"], _ ->
          Upgrade body |> k
-
-      | `GET, ["server_config"], _ ->
-         Server_config () |> k
-
+  
       | `GET , ["exercise_score"], Some token ->
          Exercise_score token |> k
 

@@ -22,7 +22,7 @@ let check_if_need_refresh has_server =
   if has_server then
     let local_server_id = Learnocaml_local_storage.(retrieve server_id) in
     retrieve @@ Learnocaml_api.Version ()
-    >|= (fun (_, server_id) ->
+    >|= (fun (_, server_id, _) ->
     if local_server_id <> server_id then
       let title = [%i "WARNING: You have an older grader version than the server"]
       and ok_label = [%i "Refresh the page"]
@@ -97,7 +97,7 @@ let () =
   Learnocaml_local_storage.init ();
   Server_caller.request (Learnocaml_api.Version ()) >>=
     (function
-     | Ok (_, server_id) -> Learnocaml_local_storage.(store server_id) server_id; Lwt.return_true
+     | Ok (_, server_id, _) -> Learnocaml_local_storage.(store server_id) server_id; Lwt.return_true
      | Error _ -> Lwt.return_false) >>= fun has_server ->
   let token = get_token ~has_server ()
   in
