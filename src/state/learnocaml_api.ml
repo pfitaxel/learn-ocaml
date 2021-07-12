@@ -113,7 +113,7 @@ type _ request =
   | Upgrade:
       string -> string request
   | Server_config:
-      unit -> (string * bool) list request
+      unit -> (string * string) list request
 
   | Exercise_score:
       Token.t -> (string * int) list request
@@ -225,7 +225,7 @@ module Conversions (Json: JSON_CODEC) = struct
       | Upgrade_form _ -> str
       | Upgrade _ -> str
 
-      | Server_config () -> json J.(J.assoc J.bool)
+      | Server_config () -> json J.(J.assoc J.string)
 
       | Exercise_score _ -> json J.(J.assoc J.int)
 

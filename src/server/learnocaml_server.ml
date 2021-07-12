@@ -983,7 +983,7 @@ module Request_handler = struct
          lwt_fail (`Forbidden, "Users with passwords are disabled on this instance.")
 
       | Api.Server_config _ ->
-         respond_json cache [("use_passwd", config.ServerData.use_passwd)]
+         respond_json cache [("use_passwd", (string_of_bool config.ServerData.use_passwd))]
 
       | Api.Exercise_score token ->
          Save.get token >>= fun save ->
