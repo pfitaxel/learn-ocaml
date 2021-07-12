@@ -27,7 +27,7 @@ type _ request =
   | Static:
       string list -> string request
   | Version:
-      unit -> (string * int * bool) request
+      unit -> (string * int) request
   | Nonce:
       unit -> string request
   | Create_token:
@@ -125,6 +125,9 @@ type _ request =
       string -> string request
   | Upgrade:
       string -> string request
+
+  | Server_config:
+      unit -> (string * bool) list request
 
   | Exercise_score:
       Token.t -> (string * int) list request

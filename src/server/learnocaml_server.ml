@@ -320,7 +320,7 @@ module Request_handler = struct
     = let module ServerData = Learnocaml_data.Server in
       fun conn config cache req -> function
       | Api.Version () ->
-         respond_json cache (Api.version, config.ServerData.server_id, config.ServerData.use_passwd)
+         respond_json cache (Api.version, config.ServerData.server_id)
       | Api.Launch body when config.ServerData.use_moodle ->
          (* 32 bytes of entropy, same as RoR as of 2020. *)
          let csrf_token = generate_csrf_token 32 in
@@ -981,6 +981,9 @@ module Request_handler = struct
          lwt_fail (`Forbidden, "Users with passwords are disabled on this instance.")
       | Api.Upgrade _ ->
          lwt_fail (`Forbidden, "Users with passwords are disabled on this instance.")
+
+      | Api.Server_config _ ->
+         respond_json cache [("use_passwd", config.ServerData.use_passwd)]
 
       | Api.Exercise_score token ->
          Save.get token >>= fun save ->

@@ -589,7 +589,7 @@ let upload_report server token ex solution report =
 
 let check_server_version ?(allow_static=false) server =
   Lwt.catch (fun () ->
-      fetch server (Api.Version ()) >|= fun (server_version,_, _) ->
+      fetch server (Api.Version ()) >|= fun (server_version,_) ->
       if server_version <> Api.version then
         (Printf.eprintf "API version mismatch: client v.%s and server v.%s\n"
            Api.version server_version;
@@ -752,7 +752,7 @@ let get_config_server ?local ?(save_back=false) ?(allow_static=false) server_opt
   get_config_option_server ?local ~save_back ~allow_static server_opt
   >>= function
   | Some c -> Lwt.return c
-  | None -> Lwt.fail_with "No config file found. Please do `learn-ocaml-client init|init-server`"
+  | None -> Lwt.fail_with "No config file found. Please do `learn-ocaml-client init`"
 
 let get_config_o_server ?save_back ?(allow_static=false) o =
   let open Args_server in
@@ -891,7 +891,7 @@ module Init_user = struct
       match global_args.server_url with
       | None -> ConfigFile.read path >>= fun c ->
                 if c.server = Uri.empty
-                then Lwt.fail_with "You must provide a server."
+                then Lwt.fail_with "You must provide a server with init-server."
                 else Lwt.return c.server
       | Some s -> Lwt.return s
     in
@@ -1249,6 +1249,32 @@ module Exercise_list = struct
     Term.info ~man ~doc:doc "exercise-list"
 end
 
+module Server_config = struct
+
+  let doc = "Get a structured json containing an information about the use_password compatibility"
+
+  let server_config o = get_config_o_server ~allow_static:true o
+    >>= fun {ConfigFile.server;_} ->
+    fetch server (Learnocaml_api.Server_config ())
+    >>= (fun isPassword->
+    let open Json_encoding in
+    let ezjsonm = (Json_encoding.construct (assoc bool)
+                  isPassword)
+    in
+    Ezjsonm.value_to_channel ~minify:false stdout ezjsonm;
+    Lwt.return 0)
+
+  let man = man doc
+
+  let cmd =
+    Term.(
+      const (fun go -> Pervasives.exit (Lwt_main.run (server_config go)))
+      $ Args_server.term),
+    Term.info ~man
+      ~doc:doc
+      "server-config"
+end
+
 module Exercise_score = struct
   let doc = "Get informations about scores of exercises"
 
@@ -1299,7 +1325,8 @@ let () =
           ; Print_server.cmd
           ; Template.cmd
           ; Create_token.cmd
-          ; Exercise_list.cmd]
+          ; Exercise_list.cmd
+          ; Server_config.cmd]
   with
   | exception Failure msg ->
       Printf.eprintf "[ERROR] %s\n" msg;
