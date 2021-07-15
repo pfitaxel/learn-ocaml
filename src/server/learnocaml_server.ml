@@ -8,6 +8,9 @@
 
 open Learnocaml_data
 open Learnocaml_store
+open Js_utils
+
+module H = Tyxml_js.Html
 
 let check_email_ml email =
   let regexp = Str.regexp Learnocaml_data.email_regexp_ml in
@@ -37,6 +40,47 @@ let args = Arg.align @@
     "PORT the TCP port (8080)" ]
 
 open Lwt.Infix
+
+let dialog_layer_id = "ocp-dialog-layer"
+
+let box_button txt f =
+  H.button ~a: [
+    H.a_onclick (fun _ ->
+        begin
+          match Manip.by_id dialog_layer_id with
+          | Some div -> Manip.removeChild Manip.Elt.body div
+          | None -> ()
+        end;
+        f ();
+        false
+      )
+    ] [ H.txt txt ]
+
+let close_button txt =
+  box_button txt @@ fun () -> ()
+
+let ext_alert ~title ?(buttons = [close_button [%i"OK"]]) message =
+  let div = match Manip.by_id dialog_layer_id with
+    | Some div -> div
+    | None ->
+        let div =
+          H.div ~a:[ H.a_id dialog_layer_id ;
+                     H.a_class ["learnocaml-dialog-overlay"] ]
+            []
+        in
+        Manip.(appendChild Elt.body) div;
+        div in
+  Manip.replaceChildren div [
+    H.div [
+      H.h3 [ H.txt title ];
+      H.div message;
+      H.div ~a:[ H.a_class ["buttons"] ] buttons;
+    ]
+  ]
+
+let cb_alert ?(title=[%i"ERROR"]) message f =
+  ext_alert ~title ~buttons:[box_button [%i"OK"] @@ f]
+    [ H.p [H.txt (String.trim message)] ]
 
 let read_static_file path =
   Lwt_io.(with_file ~mode: Input (sanitise_path !static_dir path) read)
@@ -364,7 +408,8 @@ module Request_handler = struct
                                                     else redirection (None, None, c, t)
                    | (None, None, Some _ ,_) -> lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/#activity%3Dlessons%26lesson%3Ddemo"; cookies }
                    | (None, None, None, Some _) -> lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/#activity%3Dtoplevel"; cookies }
-                   | (None,None,None,None) -> lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/"; cookies } in
+                   | (None,None,None,None) -> cb_alert ~title:[%i"Error"] [%i" "] (fun () -> ());
+                                              lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/"; cookies } in
                  redirection  ((List.assoc_opt "custom_exercise" params),
                                (List.assoc_opt "custom_playground" params),
                                (List.assoc_opt "custom_course" params),
