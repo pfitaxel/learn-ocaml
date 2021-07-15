@@ -1,11 +1,8 @@
 (library
  (name learnocaml_server_lib)
  (wrapped false)
- (flags :standard -warn-error +8-9-27-32)
+ (flags :standard -warn-error +8)
  (modules Learnocaml_server)
- (preprocess
- 	(per_module ((pps ppx_ocplib_i18n js_of_ocaml.ppx)
- 			Learnocaml_server)))
  (libraries ocplib-json-typed
             ezjsonm
             lwt.unix
@@ -19,7 +16,6 @@
             learnocaml_data
             learnocaml_api
             learnocaml_store
-            jsutils
             learnocaml_sendmail
             token_index
             learnocaml_partition_create
