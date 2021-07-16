@@ -193,14 +193,44 @@
 )
 
 (executable
- (name learnocaml_redirection_main)
+ (name learnocaml_redirection_badlesson)
  (modes byte)
  (flags :standard -warn-error -6-9-27-33-39)
  (libraries ace
             learnocaml_app_common
             js_of_ocaml.ppx
             ocplib_i18n)
- (modules Learnocaml_redirection_main)
+ (modules Learnocaml_redirection_badlesson)
+ (preprocess (pps ppx_ocplib_i18n js_of_ocaml.ppx))
+ (js_of_ocaml
+  (flags :standard +cstruct/cstruct.js)
+  (javascript_files ../ace-lib/ace_bindings.js))
+)
+
+(executable
+ (name learnocaml_redirection_badexercise)
+ (modes byte)
+ (flags :standard -warn-error -6-9-27-33-39)
+ (libraries ace
+            learnocaml_app_common
+            js_of_ocaml.ppx
+            ocplib_i18n)
+ (modules Learnocaml_redirection_badexercise)
+ (preprocess (pps ppx_ocplib_i18n js_of_ocaml.ppx))
+ (js_of_ocaml
+  (flags :standard +cstruct/cstruct.js)
+  (javascript_files ../ace-lib/ace_bindings.js))
+)
+
+(executable
+ (name learnocaml_redirection_badplayground)
+ (modes byte)
+ (flags :standard -warn-error -6-9-27-33-39)
+ (libraries ace
+            learnocaml_app_common
+            js_of_ocaml.ppx
+            ocplib_i18n)
+ (modules Learnocaml_redirection_badplayground)
  (preprocess (pps ppx_ocplib_i18n js_of_ocaml.ppx))
  (js_of_ocaml
   (flags :standard +cstruct/cstruct.js)
@@ -234,7 +264,9 @@
         (learnocaml_lti_main.bc.js as www/js/learnocaml-lti.js)
         (learnocaml_reset_main.bc.js as www/js/learnocaml-reset.js)
         (learnocaml_upgrade_main.bc.js as www/js/learnocaml-upgrade.js)
-        (learnocaml_redirection_main.bc.js as www/js/learnocaml-redirection.js)
+        (learnocaml_redirection_badlesson.bc.js as www/js/learnocaml-redirection-badlesson.js)
+        (learnocaml_redirection_badexercise.bc.js as www/js/learnocaml-redirection-badexercise.js)
+        (learnocaml_redirection_badplayground.bc.js as www/js/learnocaml-redirection-badplayground.js)
 	(learnocaml_validate_main.bc.js as www/js/learnocaml-validate.js))
 )
 

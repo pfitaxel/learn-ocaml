@@ -27,6 +27,5 @@ let redirect () =
 let () =
   (match Js_utils.get_lang () with Some l -> Ocplib_i18n.set_lang l | None -> ());
   let message =
-    [%i"You entered bad parameter. You will be redirect to the home page."] in
+    [%i"Error: lesson was not found. Redirecting to the homepage."] in
   cb_alert ~title:[%i"Redirection"] message redirect
-

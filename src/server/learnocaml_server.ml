@@ -353,7 +353,7 @@ module Request_handler = struct
                                                 | Learnocaml_data.Exercise.Index.Exercises _ -> [] in
                                               if List.exists (fun name -> name = exercise) names
                                               then lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/exercises/"^exercise^"/#tab%3Dtext"; cookies }
-                                              else respond_static cache ["redirection.html"]
+                                              else respond_static cache ["redirection_badexercise.html"]
                    | (None , Some playground, _, _) -> Playground.Index.get () >>= fun playgrounds ->
                                                     let find_names exs = List.map
                                                                                (fun group -> (fst group))
@@ -361,7 +361,7 @@ module Request_handler = struct
                                                     let names = find_names playgrounds in
                                                     if List.exists (fun name -> name = playground) names
                                                     then lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/playground/"^playground^"/#tab%3Dtoplevel"; cookies }
-                                                    else respond_static cache ["redirection.html"]
+                                                    else respond_static cache ["redirection_badplayground.html"]
                    | (None, None, Some lesson ,_) -> Lesson.Index.get () >>= fun lessons ->
                                                     let find_names exs = List.map
                                                                                (fun group -> (fst group))
@@ -369,12 +369,12 @@ module Request_handler = struct
                                                     let names = find_names lessons in
                                                     if List.exists (fun name -> name = lesson) names
                                                     then lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/#activity%3Dlessons%26lesson%3D"^lesson; cookies }
-                                                    else respond_static cache ["redirection.html"]
+                                                    else respond_static cache ["redirection_badlesson.html"]
                    | (None, None, None, Some _) -> lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/#activity%3Dtoplevel"; cookies }
                    | (None,None,None,None) -> lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/"; cookies } in
                  redirection  ((List.assoc_opt "custom_exercise" params),
                                (List.assoc_opt "custom_playground" params),
-                               (List.assoc_opt "custom_course" params),
+                               (List.assoc_opt "custom_lesson" params),
                                (List.assoc_opt "custom_toplevel" params))
                else
                  Token_index.OauthIndex.get_current_secret !sync_dir >>= fun secret ->
