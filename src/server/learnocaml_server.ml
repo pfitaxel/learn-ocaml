@@ -340,12 +340,12 @@ module Request_handler = struct
                                   ~expiration:(`Max_age (Int64.of_int 60))
                                   ~path:"/"
                                   ("token", Token.to_string token)] in
-                 let rec redirection custom_params = match custom_params with
-                   | (Some exercise,p,c,t) -> Exercise.Index.get () >>= fun exercises ->
+                 let redirection custom_params = match custom_params with
+                   | (Some exercise,_,_,_) -> Exercise.Index.get () >>= fun exercises ->
                                               let find_exercises_names contents = match contents with
                                                 | Learnocaml_data.Exercise.Index.Groups _ -> failwith "erreur find_exercises_names"
                                                 | Learnocaml_data.Exercise.Index.Exercises exos -> List.map fst exos in
-                                              let rec find_names exs = List.map
+                                              let find_names exs = List.map
                                                                          (fun group -> find_exercises_names (snd group).Learnocaml_data.Exercise.Index.contents)
                                                                          exs in
                                               let names = match exercises with
@@ -353,16 +353,23 @@ module Request_handler = struct
                                                 | Learnocaml_data.Exercise.Index.Exercises _ -> [] in
                                               if List.exists (fun name -> name = exercise) names
                                               then lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/exercises/"^exercise^"/#tab%3Dtext"; cookies }
-                                              else redirection (None, p, c, t)
-                   | (None , Some playground, c, t) -> Playground.Index.get () >>= fun playgrounds ->
-                                                    let rec find_names exs = List.map
+                                              else respond_static cache ["redirection.html"]
+                   | (None , Some playground, _, _) -> Playground.Index.get () >>= fun playgrounds ->
+                                                    let find_names exs = List.map
                                                                                (fun group -> (fst group))
                                                                                exs in
                                                     let names = find_names playgrounds in
                                                     if List.exists (fun name -> name = playground) names
                                                     then lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/playground/"^playground^"/#tab%3Dtoplevel"; cookies }
-                                                    else redirection (None, None, c, t)
-                   | (None, None, Some _ ,_) -> lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/#activity%3Dlessons%26lesson%3Ddemo"; cookies }
+                                                    else respond_static cache ["redirection.html"]
+                   | (None, None, Some lesson ,_) -> Lesson.Index.get () >>= fun lessons ->
+                                                    let find_names exs = List.map
+                                                                               (fun group -> (fst group))
+                                                                               exs in
+                                                    let names = find_names lessons in
+                                                    if List.exists (fun name -> name = lesson) names
+                                                    then lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/#activity%3Dlessons%26lesson%3D"^lesson; cookies }
+                                                    else respond_static cache ["redirection.html"]
                    | (None, None, None, Some _) -> lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/#activity%3Dtoplevel"; cookies }
                    | (None,None,None,None) -> lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/"; cookies } in
                  redirection  ((List.assoc_opt "custom_exercise" params),
@@ -999,7 +1006,7 @@ module Request_handler = struct
            | Learnocaml_data.Exercise.Index.Groups _ -> failwith "erreur find_exercises_names"
            | Learnocaml_data.Exercise.Index.Exercises exos -> List.map fst exos in
 
-         let rec find_names exs = List.map
+         let find_names exs = List.map
                                     (fun group -> find_exercises_names (snd group).Learnocaml_data.Exercise.Index.contents)
                                     exs in
 
