@@ -340,7 +340,42 @@ module Request_handler = struct
                                   ~expiration:(`Max_age (Int64.of_int 60))
                                   ~path:"/"
                                   ("token", Token.to_string token)] in
-                 lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
+                 let redirection custom_params = match custom_params with
+                   | (Some exercise,_,_,_) -> Exercise.Index.get () >>= fun exercises ->
+                                              let find_exercises_names contents = match contents with
+                                                | Learnocaml_data.Exercise.Index.Groups _ -> failwith "erreur find_exercises_names"
+                                                | Learnocaml_data.Exercise.Index.Exercises exos -> List.map fst exos in
+                                              let find_names exs = List.map
+                                                                         (fun group -> find_exercises_names (snd group).Learnocaml_data.Exercise.Index.contents)
+                                                                         exs in
+                                              let names = match exercises with
+                                                | Learnocaml_data.Exercise.Index.Groups exs -> List.concat (find_names exs)
+                                                | Learnocaml_data.Exercise.Index.Exercises _ -> [] in
+                                              if List.exists (fun name -> name = exercise) names
+                                              then lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/exercises/"^exercise^"/#tab%3Dtext"; cookies }
+                                              else lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/redirection?kind=exercise&id="^exercise; cookies }
+                   | (None , Some playground, _, _) -> Playground.Index.get () >>= fun playgrounds ->
+                                                    let find_names exs = List.map
+                                                                               (fun group -> (fst group))
+                                                                               exs in
+                                                    let names = find_names playgrounds in
+                                                    if List.exists (fun name -> name = playground) names
+                                                    then lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/playground/"^playground^"/#tab%3Dtoplevel"; cookies }
+                                                    else lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/redirection?kind=playground&id="^playground; cookies }
+                   | (None, None, Some lesson ,_) -> Lesson.Index.get () >>= fun lessons ->
+                                                    let find_names exs = List.map
+                                                                               (fun group -> (fst group))
+                                                                               exs in
+                                                    let names = find_names lessons in
+                                                    if List.exists (fun name -> name = lesson) names
+                                                    then lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/#activity%3Dlessons%26lesson%3D"^lesson; cookies }
+                                                    else lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/redirection?kind=lesson&id="^lesson; cookies }
+                   | (None, None, None, Some _) -> lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/#activity%3Dtoplevel"; cookies }
+                   | (None,None,None,None) -> lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/"; cookies } in
+                 redirection  ((List.assoc_opt "custom_exercise" params),
+                               (List.assoc_opt "custom_playground" params),
+                               (List.assoc_opt "custom_lesson" params),
+                               (List.assoc_opt "custom_toplevel" params))
                else
                  Token_index.OauthIndex.get_current_secret !sync_dir >>= fun secret ->
                  let hmac = generate_hmac secret csrf_token id in
@@ -544,7 +579,7 @@ module Request_handler = struct
          (fun exn -> (`Internal_server_error, Printexc.to_string exn))
       | Api.Archive_zip token ->
           let open Lwt_process in
-          let path = Filename.concat !sync_dir (Token.to_path token) in 
+          let path = Filename.concat !sync_dir (Token.to_path token) in
           let cmd = shell ("git archive master --format=zip -0 --remote="^path)
           and stdout = `FD_copy Unix.stdout in
           Lwt_process.pread ~stdin:stdout cmd >>= fun contents ->
@@ -955,7 +990,47 @@ module Request_handler = struct
          lwt_fail (`Forbidden, "Users with passwords are disabled on this instance.")
 
       | Api.Server_config _ ->
-         lwt_fail (`Forbidden, "pas encore fait")
+         respond_json cache [("use_passwd", (string_of_bool config.ServerData.use_passwd))]
+
+      | Api.Exercise_score token ->
+         Save.get token >>= fun save ->
+         Exercise.Index.get () >>= fun exercises ->
+         let results = match save with
+           | Some save ->
+              SMap.map
+                (fun st -> Answer.(st.grade))
+                save.Save.all_exercise_states
+           | _ -> SMap.empty in
+
+         let find_exercises_names contents = match contents with
+           | Learnocaml_data.Exercise.Index.Groups _ -> failwith "erreur find_exercises_names"
+           | Learnocaml_data.Exercise.Index.Exercises exos -> List.map fst exos in
+
+         let find_names exs = List.map
+                                    (fun group -> find_exercises_names (snd group).Learnocaml_data.Exercise.Index.contents)
+                                    exs in
+
+         let names = match exercises with
+           | Learnocaml_data.Exercise.Index.Groups exs -> List.concat (find_names exs)
+           | Learnocaml_data.Exercise.Index.Exercises _ -> [] in
+
+         if SMap.is_empty results then
+           respond_json cache []
+         else
+           let rec grade_list exs = match exs with
+             | [] -> []
+             | ex_name::tail -> if SMap.exists (fun key _ -> key = ex_name ) results
+                                then match SMap.find ex_name results with
+                                     | Some grade -> (ex_name, (*string_of_int*) grade)::(grade_list tail)
+                                     | None -> (*(ex_name, "N/A")::*)(grade_list tail)
+                                else (*(ex_name, "N/A")::*)(grade_list tail) in
+           respond_json cache (grade_list names)
+
+      | Api.Return _ ->
+         let make_cookie = Cohttp.Cookie.Set_cookie_hdr.make
+                             ~expiration:(`Max_age (Int64.of_int 60)) ~path:"/" in
+         let cookies = [make_cookie ~http_only:true ("csrf", "expired")] in
+         lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
       | Api.Invalid_request body ->
           lwt_fail (`Bad_request, body)
 

@@ -117,6 +117,7 @@ let () =
         "txt_upgrade_password", [%i"Password"];
         "txt_upgrade_password_confirmation", [%i"Confirm password"];
         "txt_do_upgrade", [%i"Upgrade"];
+        "txt_do_return", [%i"Return"];
         "txt_info", [%i"An e-mail will be sent to your address to confirm it."];
       ];
     init_token_dialog ()

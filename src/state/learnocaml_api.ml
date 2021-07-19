@@ -113,7 +113,13 @@ type _ request =
   | Upgrade:
       string -> string request
   | Server_config:
-      unit -> bool request
+      unit -> (string * string) list request
+
+  | Exercise_score:
+      Token.t -> (string * int) list request
+
+  | Return:
+      string -> string request
 
   | Invalid_request:
       string -> string request
@@ -219,7 +225,11 @@ module Conversions (Json: JSON_CODEC) = struct
       | Upgrade_form _ -> str
       | Upgrade _ -> str
 
-      | Server_config () -> json J.bool
+      | Server_config () -> json J.(J.assoc J.string)
+
+      | Exercise_score _ -> json J.(J.assoc J.int)
+
+      | Return _ -> str
 
       | Invalid_request _ ->
           str
@@ -370,7 +380,13 @@ module Conversions (Json: JSON_CODEC) = struct
        post ["do_upgrade"] body
 
     | Server_config () ->
-       get ["get_server_config"]
+       get ["server_config"]
+
+    | Exercise_score token ->
+       get ~token ["exercise_score"]
+
+    | Return _ ->
+       assert false (* Reserved for a link *)
 
     | Invalid_request s ->
         failwith ("Error request "^s)
@@ -493,6 +509,9 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
       | `POST body, ["launch"; "direct"], _ ->
          Launch_direct body |> k
 
+      | `GET, ("redirection"::_path), _ ->
+         Static ["redirection.html"] |> k
+
       | `GET, ("description"::_path), _token ->
          (* match token with
           | None -> Invalid_request "Missing token" |> k *)
@@ -556,8 +575,14 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
       | `POST body, ["do_upgrade"], _ ->
          Upgrade body |> k
 
-      | `GET, ["get_server_config"], _ ->
+      | `GET, ["server_config"], _ ->
          Server_config () |> k
+
+      | `GET , ["exercise_score"], Some token ->
+         Exercise_score token |> k
+
+      | `POST body, ["do_return"], _ ->
+         Return body |> k
 
       | `GET, ["teacher"; "exercise-status.json"], Some token
         when Token.is_teacher token ->
