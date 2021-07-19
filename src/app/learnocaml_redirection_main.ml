@@ -1,6 +1,6 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2020 Alban Gruin
+ * Copyright (C) 2021 Learn-OCaml developers
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -26,7 +26,9 @@ let redirect () =
 
 let () =
   (match Js_utils.get_lang () with Some l -> Ocplib_i18n.set_lang l | None -> ());
-  let message =
-    [%i"You entered bad parameter. You will be redirect to the home page."] in
+  let args = Url.Current.arguments in
+  let message = match List.assoc_opt "kind" args, List.assoc_opt "id" args with
+  | Some kind, Some id -> [%i"Error: "]^kind^" "^id^[%i" was not found. Redirecting to the homepage."]
+  | _ -> [%i "Redirecting to the homepage."]
+  in
   cb_alert ~title:[%i"Redirection"] message redirect
-

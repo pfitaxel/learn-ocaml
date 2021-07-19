@@ -509,6 +509,9 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
       | `POST body, ["launch"; "direct"], _ ->
          Launch_direct body |> k
 
+      | `GET, ("redirection"::_path), _ ->
+         Static ["redirection.html"] |> k
+
       | `GET, ("description"::_path), _token ->
          (* match token with
           | None -> Invalid_request "Missing token" |> k *)
