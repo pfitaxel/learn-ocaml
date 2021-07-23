@@ -38,6 +38,8 @@ let args = Arg.align @@
 
 open Lwt.Infix
 
+type kind = Exercise of string*bool | Lesson of string*bool | Playground of string*bool | Toplevel
+
 let read_static_file path =
   Lwt_io.(with_file ~mode: Input (sanitise_path !static_dir path) read)
 
@@ -340,42 +342,74 @@ module Request_handler = struct
                                   ~expiration:(`Max_age (Int64.of_int 60))
                                   ~path:"/"
                                   ("token", Token.to_string token)] in
-                 let redirection custom_params = match custom_params with
-                   | (Some exercise,_,_,_) -> Exercise.Index.get () >>= fun exercises ->
-                                              let find_exercises_names contents = match contents with
-                                                | Learnocaml_data.Exercise.Index.Groups _ -> failwith "erreur find_exercises_names"
-                                                | Learnocaml_data.Exercise.Index.Exercises exos -> List.map fst exos in
-                                              let find_names exs = List.map
-                                                                         (fun group -> find_exercises_names (snd group).Learnocaml_data.Exercise.Index.contents)
-                                                                         exs in
-                                              let names = match exercises with
-                                                | Learnocaml_data.Exercise.Index.Groups exs -> List.concat (find_names exs)
-                                                | Learnocaml_data.Exercise.Index.Exercises _ -> [] in
-                                              if List.exists (fun name -> name = exercise) names
-                                              then lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/exercises/"^exercise^"/#tab%3Dtext"; cookies }
-                                              else lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/redirection?kind=exercise&id="^exercise; cookies }
-                   | (None , Some playground, _, _) -> Playground.Index.get () >>= fun playgrounds ->
-                                                    let find_names exs = List.map
-                                                                               (fun group -> (fst group))
-                                                                               exs in
-                                                    let names = find_names playgrounds in
-                                                    if List.exists (fun name -> name = playground) names
-                                                    then lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/playground/"^playground^"/#tab%3Dtoplevel"; cookies }
-                                                    else lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/redirection?kind=playground&id="^playground; cookies }
-                   | (None, None, Some lesson ,_) -> Lesson.Index.get () >>= fun lessons ->
-                                                    let find_names exs = List.map
-                                                                               (fun group -> (fst group))
-                                                                               exs in
-                                                    let names = find_names lessons in
-                                                    if List.exists (fun name -> name = lesson) names
-                                                    then lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/#activity%3Dlessons%26lesson%3D"^lesson; cookies }
-                                                    else lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/redirection?kind=lesson&id="^lesson; cookies }
-                   | (None, None, None, Some _) -> lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/#activity%3Dtoplevel"; cookies }
-                   | (None,None,None,None) -> lwt_ok @@ Redirect { code=`See_other; url= !base_url^"/"; cookies } in
-                 redirection  ((List.assoc_opt "custom_exercise" params),
-                               (List.assoc_opt "custom_playground" params),
-                               (List.assoc_opt "custom_lesson" params),
-                               (List.assoc_opt "custom_toplevel" params))
+                 let rank = function Exercise (_,_) -> 0 | Lesson (_,_) -> 1 | Playground (_,_) -> 2 | Toplevel -> 3 in
+                 let sort_from_rank l = List.sort (fun (k1) (k2) -> rank k1 - rank k2) l in
+                 (*sort_from_rank [(Lesson, "first"); (Exercise, "demo"); (Playground, "editor")]*)
+                 let ex_exist exo = Exercise.Index.get () >>= fun exercises ->
+                                    let find_exercises_names contents = match contents with
+                                      | Learnocaml_data.Exercise.Index.Groups _ -> failwith "erreur find_exercises_names"
+                                      | Learnocaml_data.Exercise.Index.Exercises exos -> List.map fst exos in
+                                    let find_names exs = List.map
+                                                           (fun group -> find_exercises_names (snd group).Learnocaml_data.Exercise.Index.contents)
+                                                           exs in
+                                    let names = match exercises with
+                                      | Learnocaml_data.Exercise.Index.Groups exs -> List.concat (find_names exs)
+                                      | Learnocaml_data.Exercise.Index.Exercises _ -> [] in
+                                    Lwt.return (List.exists (fun name -> name = exo) names) in
+                 let play_exist play = Playground.Index.get () >>= fun playgrounds ->
+                                       let find_names exs = List.map
+                                                              (fun group -> (fst group))
+                                                              exs in
+                                       let names = find_names playgrounds in
+                                       Lwt.return (List.exists (fun name -> name = play) names) in
+                 let less_exist less = Lesson.Index.get () >>= fun lessons ->
+                                       let find_names exs = List.map
+                                                              (fun group -> (fst group))
+                                                              exs in
+                                       let names = find_names lessons in
+                                       Lwt.return (List.exists (fun name -> name = less) names) in
+                 let list_redirections l =
+                   Lwt_list.fold_left_s (fun r (kind, id) ->
+                                       match kind with
+                                       | "custom_exercise" -> ex_exist id >|= fun ok ->
+                                                              Exercise (id,ok) :: r
+                                       | "custom_playground" -> play_exist id >|= fun ok ->
+                                                                Playground (id, ok) :: r
+                                       | "custom_lesson" -> less_exist id >|= fun ok ->
+                                                            Lesson (id, ok) :: r 
+                                       | "custom_toplevel" -> Lwt.return (Toplevel :: r)
+                                       | _ -> Lwt.return r
+                     ) [] l
+                 in
+                 let return_url kind_url = match kind_url with
+                   | Exercise (id,ok) -> if ok
+                                         then "/exercises/"^id^"/#tab%3Dtext"
+                                         else "/redirection?kind=exercise&id="^id
+                   | Playground (id,ok) -> if ok
+                                           then "/playground/"^id^"/#tab%3Dtoplevel"
+                                           else "/redirection?kind=playground&id="^id
+                   | Lesson (id,ok) -> if ok
+                                       then "/#activity%3Dlessons%26lesson%3D"^id
+                                       else "/redirection?kind=lesson&id="^id
+                   | Toplevel -> "/#activity%3Dtoplevel"
+                 in
+                 let return_url_many kind_url = match kind_url with
+                   | Exercise (id,ok) -> if ok
+                                         then "/redirection?kind=exercise&id="^id^"&many=true"
+                                         else "/redirection?kind=exercise&id="^id
+                   | Playground (id,ok) -> if ok
+                                           then "/redirection?kind=playground&id="^id^"&many=true"
+                                           else "/redirection?kind=playground&id="^id
+                   | Lesson (id,ok) -> if ok
+                                       then "/redirection?kind=lesson&id="^id^"&many=true"
+                                       else "/redirection?kind=lesson&id="^id
+                   | _ -> "/" in
+                 let redirection l = match sort_from_rank l with
+                     [] -> "/"
+                   | [url] -> return_url url
+                   | url :: _ -> return_url_many url in
+                 list_redirections params >>= fun list ->
+                 lwt_ok @@ Redirect { code=`See_other; url= !base_url^(redirection list); cookies }
                else
                  Token_index.OauthIndex.get_current_secret !sync_dir >>= fun secret ->
                  let hmac = generate_hmac secret csrf_token id in
