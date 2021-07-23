@@ -23,6 +23,23 @@ module El = struct
   end
 end
 
+let rec drop_2_trailing = function
+  | [] | [_] | [_; _] -> []
+  | x :: l -> x :: drop_2_trailing l
+
+(* Replace location: from [http://localhost:8080/.../...]
+   to [http://localhost:8080] *)
+let redirect () =
+  let open Js_of_ocaml__Url in
+  match Url.Current.get () with
+  | Some (Http http_url) ->
+     let new_url = {http_url with hu_path = drop_2_trailing http_url.hu_path} in
+     Url.Current.set (Http new_url)
+  | Some (Https http_url) ->
+     let new_url = {http_url with hu_path = drop_2_trailing http_url.hu_path} in
+     Url.Current.set (Https new_url)
+  | Some _ | None -> ()
+
 let check_email_js email =
   let re = Regexp.regexp Learnocaml_data.email_regexp_js in
   Learnocaml_data.email_check_length email
@@ -86,7 +103,7 @@ let init_token_dialog () =
                   email=&passwd=&confirmation=&csrf=Bfkxd/2TjpMAkq4bFGIs1hp9oxeBTZIKioMlQMUDlpk=&token=ZGB-GDD-SNB-41M*)
       >>= fun _ -> cb_alert ~title:[%i"VALIDATION REQUIRED"]
                      [%i"A confirmation e-mail has been sent to your address."]
-                     Js_utils.reload;
+                     redirect;
                    Lwt.return_none
   in
   let handler f t = fun _ ->
