@@ -1088,8 +1088,7 @@ let write_exercise_file id str =
         Printf.printf "Wrote file %s\n%!" f;
         true
 
-module Fetch = struct
-  let fetch_save server_url token =
+let fetch_save server_url token =
     Lwt.catch (fun () -> fetch server_url (Api.Fetch_save token))
     @@ function
       | Not_found ->
@@ -1097,6 +1096,8 @@ module Fetch = struct
            "Token %S not found on the server."
            (Token.to_string token)
       | e -> Lwt.fail e
+
+module Fetch = struct
 
   let write_save_files lst save =
     let has_to_fetch x =
@@ -1299,6 +1300,30 @@ module Exercise_score = struct
     Term.info ~man ~doc:doc "exercise-score"
 end
 
+module Print_nickname = struct
+
+  let print_nick o =
+    get_config_o ~allow_static:true o
+    >>= fun {ConfigFile.server;token} ->
+    (match token with
+    |Some token -> (fetch_save server token >>= fun save ->
+                   match save.Save.nickname with
+                   | "" -> Lwt_io.print "no nickname\n"
+                   | _ as nick -> Lwt_io.print (nick^"\n"))
+    |None -> Lwt.fail_with "You must provide a token")
+    >|= fun () -> 0
+
+  let explanation = "Just print the configured user nickname."
+
+  let man = man explanation
+
+  let cmd =
+    use_global print_nick,
+    Term.info ~man ~doc:explanation "print-nickname"
+  
+end
+
+
 module Main = struct
   let man =
     man
@@ -1320,6 +1345,7 @@ let () =
           ; Deinit.cmd
           ; Grade.cmd
           ; Print_token.cmd
+          ; Print_nickname.cmd
           ; Set_options.cmd
           ; Fetch.cmd
           ; Print_server.cmd
