@@ -1060,6 +1060,13 @@ module Request_handler = struct
                                 else (*(ex_name, "N/A")::*)(grade_list tail) in
            respond_json cache (grade_list names)
 
+      | Api.Set_nickname (token,nick) ->
+         Save.get token >>= fun osave ->
+         lwt_option_fail osave (`Not_found, Token.to_string token)
+         @@ fun save ->
+            let new_save = {save with Save.nickname = nick} in
+            Save.set token new_save >>= respond_json cache
+
       | Api.Return _ ->
          let make_cookie = Cohttp.Cookie.Set_cookie_hdr.make
                              ~expiration:(`Max_age (Int64.of_int 60)) ~path:"/" in

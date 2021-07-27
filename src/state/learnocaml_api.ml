@@ -118,6 +118,9 @@ type _ request =
   | Exercise_score:
       Token.t -> (string * int) list request
 
+  | Set_nickname:
+      Token.t * string -> unit request
+
   | Return:
       string -> string request
 
@@ -228,6 +231,8 @@ module Conversions (Json: JSON_CODEC) = struct
       | Server_config () -> json J.(J.assoc J.string)
 
       | Exercise_score _ -> json J.(J.assoc J.int)
+
+      | Set_nickname _ -> json J.unit
 
       | Return _ -> str
 
@@ -384,6 +389,9 @@ module Conversions (Json: JSON_CODEC) = struct
 
     | Exercise_score token ->
        get ~token ["exercise_score"]
+
+    | Set_nickname (token, nickname) ->
+        post ~token ["set_nickname"] nickname
 
     | Return _ ->
        assert false (* Reserved for a link *)
@@ -580,6 +588,9 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
 
       | `GET , ["exercise_score"], Some token ->
          Exercise_score token |> k
+
+      | `POST body, ["set_nickname"], Some token ->
+         Set_nickname (token, body) |> k
 
       | `POST body, ["do_return"], _ ->
          Return body |> k

@@ -139,6 +139,13 @@ module Args_create_token = struct
   let term = Term.(const apply $ nickname $ secret)
 end
 
+module Args_set_nickname = struct
+  let nickname =
+    value & pos 0 (some string) None & info [] ~docv:"NICKNAME" ~doc:
+      "The desired nickname."
+
+  let term = Term.(const (fun x -> x) $ nickname)
+end
 
 
 module Args_create_user = struct
@@ -1324,9 +1331,35 @@ module Print_nickname = struct
   let cmd =
     use_global print_nick,
     Term.info ~man ~doc:explanation "print-nickname"
-  
+
 end
 
+
+module Set_nickname = struct
+
+  let set_nick o nickname =
+    get_config_o ~allow_static:true o
+    >>= fun {ConfigFile.server;token} ->
+    (match token with
+     |Some token -> (match nickname with
+                     | Some nick -> fetch server (Learnocaml_api.Set_nickname (token, nick))
+                     | None -> Lwt.fail_with "You must provide a nickname")
+     |None -> Lwt.fail_with "You must provide a token")
+    >|= fun _ -> 0
+
+  let explanation = "Just change the nickname of the configured user."
+
+  let man = man explanation
+
+  let cmd =
+    Term.(
+      const (fun go n -> Pervasives.exit (Lwt_main.run (set_nick go n)))
+      $ Args_global.term $ Args_set_nickname.term),
+    Term.info ~man
+      ~doc:explanation
+      "set-nickname"
+
+end
 
 module Main = struct
   let man =
@@ -1350,6 +1383,7 @@ let () =
           ; Grade.cmd
           ; Print_token.cmd
           ; Print_nickname.cmd
+          ; Set_nickname.cmd
           ; Set_options.cmd
           ; Fetch.cmd
           ; Print_server.cmd

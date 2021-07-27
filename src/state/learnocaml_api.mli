@@ -132,6 +132,9 @@ type _ request =
   | Exercise_score:
       Token.t -> (string * int) list request
 
+  | Set_nickname:
+      Token.t * string -> unit request
+
   | Return:
       string -> string request
 
