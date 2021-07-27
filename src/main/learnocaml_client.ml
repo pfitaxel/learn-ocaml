@@ -858,10 +858,14 @@ module Deinit = struct
     then
       begin
         Sys.remove path;
-        Printf.eprintf "Configuration removed from %s.\n%!" path
+        Printf.eprintf "Configuration removed from %s.\n%!" path;
+        Lwt.return 0
       end
-    else Printf.eprintf "Cannot remove %s : no such file or directory.\n%!" path;
-    Lwt.return 0
+    else
+      begin
+        Printf.eprintf "Cannot remove %s: no such file or directory.\n%!" path;
+        Lwt.return 1
+      end
 
   let man = man "delete current configuration file."
 
