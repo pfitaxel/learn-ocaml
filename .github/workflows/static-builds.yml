@@ -56,7 +56,7 @@ jobs:
           sw_vers
           system_profiler SPSoftwareDataType
           uname -a
-          opam config list
+          opam --version
       - name: Prepare build environment
         run: |
           opam init -a --bare
