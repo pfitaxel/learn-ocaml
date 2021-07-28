@@ -8,7 +8,6 @@
 open Js_utils
 open Lwt
 open Learnocaml_common
-open Learnocaml_api
 
 module El = struct
   let id s = s, find_component s

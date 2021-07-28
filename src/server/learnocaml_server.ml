@@ -41,7 +41,7 @@ open Lwt.Infix
 let read_static_file path =
   Lwt_io.(with_file ~mode: Input (sanitise_path !static_dir path) read)
 
-exception Too_long_body
+(*exception Too_long_body
 
 let string_of_stream ?(max_size = 1024 * 1024) s =
   let b = Buffer.create (64 * 1024) in
@@ -61,7 +61,7 @@ let string_of_stream ?(max_size = 1024 * 1024) s =
   end begin function
     | Too_long_body -> Lwt.return None
     | e -> Lwt.fail e
-  end
+  end*)
 
 module Api = Learnocaml_api
 
