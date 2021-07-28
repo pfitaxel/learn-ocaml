@@ -60,6 +60,8 @@ jobs:
       - name: Prepare build environment
         run: |
           opam init -a --bare
+          echo "OPAMYES=$OPAMYES"
+          echo "OPAMDEPEXTYES=$OPAMDEPEXTYES"
           opam switch create . ocaml-base-compiler 'dune<2' --deps-only
       - name: Build the binaries
         run: |
