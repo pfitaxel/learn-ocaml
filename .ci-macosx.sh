@@ -6,6 +6,7 @@ brew update
 brew install pkg-config
 brew install opam
 brew install libev
+brew install lzlib
 opam init -y --compiler=4.05.0
 eval $(opam env)
 
