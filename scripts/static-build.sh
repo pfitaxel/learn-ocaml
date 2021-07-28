@@ -13,7 +13,7 @@ git ls-files -z | xargs -0 tar c | \
     ocamlpro/ocaml:4.05 \
     sh -uexc \
       'tar x >&2 &&
-       sudo apk add openssl-libs-static >&2 &&
+       sudo apk add openssl-libs-static zlib-static >&2 &&
        opam switch create . ocaml-system "dune<2" --deps-only >&2 &&
        opam exec make LINKING_MODE=static >&2 &&
        tar c -hC _build/install/default/bin .' | \
