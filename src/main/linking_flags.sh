@@ -43,7 +43,7 @@ case $(uname -s) in
     Linux)
         case $(. /etc/os-release && echo $ID) in
             alpine)
-                COMMON_LIBS="camlstr base_stubs ssl_threads_stubs ssl crypto cstruct_stubs lwt_unix_stubs bigarray unix c"
+                COMMON_LIBS="safepass_stubs netsys rt cryptokit_stubs z zarith gmp camlstr base_stubs ssl_threads_stubs ssl crypto cstruct_stubs lwt_unix_stubs bigarray unix c"
                 # `m` and `pthread` are built-in musl
                 echo '(-noautolink'
                 echo ' -cclib -Wl,-Bstatic'
@@ -59,7 +59,7 @@ case $(uname -s) in
         esac
         ;;
     Darwin)
-        COMMON_LIBS="camlstr base_stubs ssl_threads_stubs /usr/local/opt/openssl/lib/libssl.a /usr/local/opt/openssl/lib/libcrypto.a cstruct_stubs lwt_unix_stubs bigarray unix"
+        COMMON_LIBS="safepass_stubs netsys cryptokit_stubs z zarith gmp camlstr base_stubs ssl_threads_stubs /usr/local/opt/openssl/lib/libssl.a /usr/local/opt/openssl/lib/libcrypto.a cstruct_stubs lwt_unix_stubs bigarray unix"
         # `m` and `pthread` are built-in in libSystem
         echo '(-noautolink'
         for l in $EXTRA_LIBS $COMMON_LIBS; do

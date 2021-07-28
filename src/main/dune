@@ -58,11 +58,11 @@
 (rule
   (targets linking_main.sexp)
   (action  (with-stdout-to %{targets}
-    (run ./linking_flags.sh %{env:LINKING_MODE=dynamic} %{ocaml-config:system} laolao_stubs threads camlrun))))
+    (run ./linking_flags.sh %{env:LINKING_MODE=dynamic} %{ocaml-config:system} netaccel_c laolao_stubs threads camlrun))))
 (rule
   (targets linking_client.sexp)
   (action  (with-stdout-to %{targets}
-    (run ./linking_flags.sh %{env:LINKING_MODE=dynamic} %{ocaml-config:system} threads camlrun))))
+    (run ./linking_flags.sh %{env:LINKING_MODE=dynamic} %{ocaml-config:system} netaccel_c threads camlrun))))
 (rule
   (targets linking_server.sexp)
   (action  (with-stdout-to %{targets}
