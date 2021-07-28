@@ -24,10 +24,10 @@ esac
 
 shift
 case "$1" in
-    macosx) shift; EXTRA_LIBS="curses $*";;
+    macosx) shift; EXTRA_LIBS="$* curses";;
     linux) shift; EXTRA_LIBS="$*";;
     --) shift; EXTRA_LIBS="$*";;
-    *) echo "Not supported %{ocamlc-config:system} '$1'."; help_exit
+    *) echo "Not supported %{ocaml-config:system} '$1'."; help_exit
 esac
 
 ## Static linking configuration ##
