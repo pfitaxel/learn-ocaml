@@ -36,3 +36,5 @@ translations/*.pot
 **/.merlin
 
 tests/corpuses/*
+
+detect-libs.*
