@@ -62,6 +62,7 @@ jobs:
           opam init -a --bare
           echo "OPAMYES=$OPAMYES"
           echo "OPAMDEPEXTYES=$OPAMDEPEXTYES"
+          brew install lzlib  # should be automatic
           opam switch create . ocaml-base-compiler 'dune<2' --deps-only
       - name: Build the binaries
         run: |
