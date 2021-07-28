@@ -1067,11 +1067,6 @@ module Request_handler = struct
             let new_save = {save with Save.nickname = nick} in
             Save.set token new_save >>= respond_json cache
 
-      | Api.Return _ ->
-         let make_cookie = Cohttp.Cookie.Set_cookie_hdr.make
-                             ~expiration:(`Max_age (Int64.of_int 60)) ~path:"/" in
-         let cookies = [make_cookie ~http_only:true ("csrf", "expired")] in
-         lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
       | Api.Invalid_request body ->
           lwt_fail (`Bad_request, body)
 

@@ -121,9 +121,6 @@ type _ request =
   | Set_nickname:
       Token.t * string -> unit request
 
-  | Return:
-      string -> string request
-
   | Invalid_request:
       string -> string request
 
@@ -233,8 +230,6 @@ module Conversions (Json: JSON_CODEC) = struct
       | Exercise_score _ -> json J.(J.assoc J.int)
 
       | Set_nickname _ -> json J.unit
-
-      | Return _ -> str
 
       | Invalid_request _ ->
           str
@@ -392,9 +387,6 @@ module Conversions (Json: JSON_CODEC) = struct
 
     | Set_nickname (token, nickname) ->
         post ~token ["set_nickname"] nickname
-
-    | Return _ ->
-       assert false (* Reserved for a link *)
 
     | Invalid_request s ->
         failwith ("Error request "^s)
@@ -591,9 +583,6 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
 
       | `POST body, ["set_nickname"], Some token ->
          Set_nickname (token, body) |> k
-
-      | `POST body, ["do_return"], _ ->
-         Return body |> k
 
       | `GET, ["teacher"; "exercise-status.json"], Some token
         when Token.is_teacher token ->

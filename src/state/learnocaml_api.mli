@@ -135,9 +135,6 @@ type _ request =
   | Set_nickname:
       Token.t * string -> unit request
 
-  | Return:
-      string -> string request
-
   | Invalid_request:
       string -> string request
     (** Only for server-side handling: bound to requests not matching any case
