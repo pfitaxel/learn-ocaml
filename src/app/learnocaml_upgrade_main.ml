@@ -20,6 +20,7 @@ module El = struct
     let upgrade_password_id, upgrade_password = id "upgrade-password-input"
     let upgrade_confirmation_id, upgrade_confirmation = id "upgrade-confirmation-input"
     let upgrade_button_id, upgrade_button = id "upgrade-button"
+    let return_button_id, return_button = id "return-button"
   end
 end
 
@@ -106,6 +107,10 @@ let init_token_dialog () =
                      redirect;
                    Lwt.return_none
   in
+
+  let return () = redirect ();
+                  Lwt.return_none in
+
   let handler f t = fun _ ->
     Lwt.async (fun () ->
         f () >|= function
@@ -113,7 +118,8 @@ let init_token_dialog () =
         | None -> ());
     t
   in
-  Manip.Ev.onclick upgrade_button (handler create_token false)
+  Manip.Ev.onclick upgrade_button (handler create_token false);
+  Manip.Ev.onclick return_button (handler return false)
 
 let set_string_translations =
   List.iter
