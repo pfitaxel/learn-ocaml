@@ -388,7 +388,7 @@ module Conversions (Json: JSON_CODEC) = struct
        get ["server_config"]
 
     | Exercise_score token ->
-       get ~token ["exercise_score"]
+       get ~token ["exercise-score.json"]
 
     | Set_nickname (token, nickname) ->
         post ~token ["set_nickname"] nickname
@@ -586,7 +586,7 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
       | `GET, ["server_config"], _ ->
          Server_config () |> k
 
-      | `GET , ["exercise_score"], Some token ->
+      | `GET , ["exercise-score.json"], Some token ->
          Exercise_score token |> k
 
       | `POST body, ["set_nickname"], Some token ->
