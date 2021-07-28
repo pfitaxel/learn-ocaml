@@ -225,9 +225,9 @@ module Conversions (Json: JSON_CODEC) = struct
       | Upgrade_form _ -> str
       | Upgrade _ -> str
 
-      | Server_config () -> json J.(J.assoc J.string)
+      | Server_config () -> json J.(assoc string)
 
-      | Exercise_score _ -> json J.(J.assoc J.int)
+      | Exercise_score _ -> json J.(assoc int)
 
       | Set_nickname _ -> json J.unit
 

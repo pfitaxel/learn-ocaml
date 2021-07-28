@@ -7,7 +7,6 @@
 
 open Js_utils
 open Lwt
-open Learnocaml_data
 open Learnocaml_common
 
 module H = Tyxml_js.Html5
