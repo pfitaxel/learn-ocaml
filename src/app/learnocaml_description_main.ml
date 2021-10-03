@@ -27,12 +27,12 @@ let get_encoded_token () =
   | exception Not_found ->
      match arg "token1" with (* encoding algo 1: space-padded token |> base64 *)
      | raw_arg ->
-        begin match Base64.decode ~pad:true raw_arg with
+        begin match B64.decode_opt (*~pad:true*) raw_arg with
         (* ~pad:false would work also, but ~pad:true is stricter *)
-        | Ok pad_token ->
+        | Some pad_token ->
            Some { arg_name = "token1"; raw_arg;
                   token = Learnocaml_data.Token.parse (String.trim pad_token) }
-        | Error (`Msg msg) -> failwith msg
+        | None -> failwith "B64: error"
         end
      | exception Not_found -> None
 
