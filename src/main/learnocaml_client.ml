@@ -1389,7 +1389,7 @@ module Server_config = struct
   let doc = "Get a structured json containing an information about the use_password compatibility"
 
   let server_config o = get_config_o_server ~allow_static:true o
-    >>= fun {ConfigFile.server;_} ->
+    >>= fun ({ConfigFile.server;_}, _version) ->
     fetch server (Learnocaml_api.Server_config ())
     >>= (fun isPassword->
     let open Json_encoding in
