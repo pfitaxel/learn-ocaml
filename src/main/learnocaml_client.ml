@@ -1118,10 +1118,10 @@ module Server_version = struct
   open Args_server_version
   open Learnocaml_api
 
-  let server_version global_args server_version_args =
+  let server_version server_args server_version_args =
     Lwt.catch
       (fun () ->
-        get_config_o ~save_back:false ~allow_static:false global_args)
+        get_config_o ~save_back:false ~allow_static:false server_args)
       begin fun e ->
       Lwt_io.eprintf "[ERROR] Input error: %s\n"
         (match e with
@@ -1180,7 +1180,7 @@ module Server_version = struct
   let cmd =
     Term.(
       const (fun o l -> Stdlib.exit (Lwt_main.run (server_version o l)))
-      $ Args_global.term $ Args_server_version.term),
+      $ Args_server.term $ Args_server_version.term),
     Term.info ~man ~exits ~doc:explanation "server-version"
 end
 
