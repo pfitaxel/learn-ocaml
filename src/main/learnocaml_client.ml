@@ -1121,7 +1121,7 @@ module Server_version = struct
   let server_version server_args server_version_args =
     Lwt.catch
       (fun () ->
-        get_config_o ~save_back:false ~allow_static:false server_args)
+        get_config_o_server ~save_back:false ~allow_static:false server_args)
       begin fun e ->
       Lwt_io.eprintf "[ERROR] Input error: %s\n"
         (match e with

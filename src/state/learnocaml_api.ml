@@ -205,34 +205,56 @@ type _ request =
   | Invalid_request:
       string -> string request
 
-let supported_versions
-  : type resp. resp request -> Compat.pred
-  = function
-  | Static _
-  | Version _
-  | Nonce _
-  | Create_token (_, _, _)
-  | Create_teacher_token _
-  | Fetch_save _
-  | Archive_zip _
-  | Update_save (_, _)
-  | Git (_, _)
-  | Students_list _
-  | Set_students_list (_, _)
-  | Students_csv (_, _, _)
-  | Exercise_index _
-  | Exercise (_, _)
-  | Lesson_index _
-  | Lesson _
-  | Tutorial_index _
-  | Tutorial _
-  | Playground_index _
-  | Playground _
-  | Exercise_status_index _
-  | Exercise_status (_, _)
-  | Set_exercise_status (_, _)
-  | Partition (_, _, _, _)
-  | Invalid_request _ -> Compat.(Since (v "0.12"))
+let supported_versions 
+    : type resp. resp request -> Compat.pred
+  = fun req ->
+  match req with 
+  | Static _ -> Compat.(Since (v "0.12"))
+    | Version _ -> Compat.(Since (v "0.12"))
+    | Nonce _ -> Compat.(Since (v "0.12"))
+    | Create_token (_,_,_) -> Compat.(Since (v "0.12"))
+    | Create_teacher_token _ -> Compat.(Since (v "0.12"))
+    | Fetch_save _ -> Compat.(Since (v "0.12"))
+    | Archive_zip _ -> Compat.(Since (v "0.12"))
+    | Update_save (_,_) -> Compat.(Since (v "0.12"))
+    | Git (_,_) -> Compat.(Since (v "0.12"))
+    | Students_list _ -> Compat.(Since (v "0.12"))
+    | Set_students_list (_,_) -> Compat.(Since (v "0.12"))
+    | Students_csv (_,_,_) -> Compat.(Since (v "0.12"))
+    | Exercise_index _ -> Compat.(Since (v "0.12"))
+    | Exercise (_,_) -> Compat.(Since (v "0.12"))
+    | Lesson_index _ -> Compat.(Since (v "0.12"))
+    | Lesson _ -> Compat.(Since (v "0.12"))
+    | Tutorial_index _ -> Compat.(Since (v "0.12"))
+    | Tutorial _ -> Compat.(Since (v "0.12"))
+    | Playground_index _ -> Compat.(Since (v "0.12"))
+    | Playground _ -> Compat.(Since (v "0.12"))
+    | Exercise_status_index _ -> Compat.(Since (v "0.12"))
+    | Exercise_status (_,_) -> Compat.(Since (v "0.12"))
+    | Set_exercise_status (_,_) -> Compat.(Since (v "0.12"))
+    | Partition (_,_,_,_) -> Compat.(Since (v "0.12"))
+    | Invalid_request _ -> Compat.(Since (v "0.12"))
+    | Create_user (_,_,_,_) -> Compat.(Since (v "0.15.0"))
+    | Login (_,_) -> Compat.(Since (v "0.15.0"))
+    | Can_login _ -> Compat.(Since (v "0.15.0"))
+    | Launch _ -> Compat.(Since (v "0.15.0"))
+    | Launch_token _ -> Compat.(Since (v "0.15.0"))
+    | Launch_login _ -> Compat.(Since (v "0.15.0"))
+    | Launch_direct _ -> Compat.(Since (v "0.15.0"))
+    | Is_moodle_account _ -> Compat.(Since (v "0.15.0"))
+    | Change_email _ -> Compat.(Since (v "0.15.0"))
+    | Abort_email_change _ -> Compat.(Since (v "0.15.0"))
+    | Confirm_email _ -> Compat.(Since (v "0.15.0"))
+    | Change_password _ -> Compat.(Since (v "0.15.0"))
+    | Send_reset_password _ -> Compat.(Since (v "0.15.0"))
+    | Reset_password _ -> Compat.(Since (v "0.15.0"))
+    | Do_reset_password _ -> Compat.(Since (v "0.15.0"))
+    | Get_emails _ -> Compat.(Since (v "0.15.0"))
+    | Upgrade_form _ -> Compat.(Since (v "0.15.0"))
+    | Upgrade _ -> Compat.(Since (v "0.15.0"))
+    | Server_config _ -> Compat.(Since (v "0.15.0"))
+    | Exercise_score _ -> Compat.(Since (v "0.15.0"))
+    | Set_nickname (_,_) -> Compat.(Since (v "0.15.0"))
 
 let is_supported
   : type resp. ?current:Compat.t -> server:Compat.t -> resp request ->
