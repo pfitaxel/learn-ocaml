@@ -458,7 +458,8 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
       | `GET, ("exercises"::path), token ->
       	   (* write code that processes the folder of multipart *)
       	   print_string ("Api_multipart_0 : \n");
-          (match last path with
+           (match last path with
+            (* TODO Simplifier car plus de sous-dossier pour les multi-part *)
            | Some s when String.lowercase_ascii (Filename.extension s) = ".json" ->
                (match token with
                 | Some token ->
