@@ -151,14 +151,24 @@ let () =
        match Manip.by_id "learnocaml-countdown" with
        | Some elt -> countdown elt t ~ontimeout:make_readonly
        | None -> ());
-  let solution =
+
+  (* fetch-draft *)
+  (* Transformation of "let solution " behavior into a function *)
+  let get_solution () =
     match Learnocaml_local_storage.(retrieve (exercise_state id)) with
     | { Answer.report = Some report ; solution ; _ } ->
         let _ : int = display_report exo report in
         solution
     | { Answer.report = None ; solution ; _ } ->
         solution
-    | exception Not_found -> Learnocaml_exercise.(access File.template exo) in
+    | exception Not_found -> Learnocaml_exercise.(access File.template exo) 
+  in
+
+  (* Writing the behavior out of the cleanup button *)
+  let get_template () = Learnocaml_exercise.(access File.template exo) in
+  
+  (* The solution is now computed by a function (can be re-computed) *)
+  let solution = get_solution () in
   (* ---- details pane -------------------------------------------------- *)
   let load_meta () =
     Lwt.async (fun () ->
@@ -182,7 +192,11 @@ let () =
   let editor, ace = setup_editor id solution in
   is_synchronized_with_server_callback := (fun () -> Ace.is_synchronized ace);
   let module EB = Editor_button (struct let ace = ace let buttons_container = editor_toolbar end) in
-  EB.cleanup (Learnocaml_exercise.(access File.template exo));
+  (* fetch-draft *)
+  (* Rewrite of cleanup and add of load_draft/grade *)
+  EB.cleanup (get_template ());
+  EB.load_draft (get_solution ());
+  EB.load_grade (get_solution ());
   EB.sync token id (fun () -> Ace.focus ace; Ace.set_synchronized ace) ;
   EB.download id;
   EB.eval top select_tab;

@@ -212,7 +212,11 @@ module type Editor_info = sig
 end
 
 module Editor_button (_ : Editor_info) : sig
+  (* fetch-draft *)
+  (* Add load_draft/grade declaration *)
   val cleanup : string -> unit
+  val load_draft : string -> unit
+  val load_grade : string -> unit
   val download : string -> unit
   val eval : Learnocaml_toplevel.t -> (string -> unit) -> unit
   val sync : Token.t option Lwt.t -> Learnocaml_data.SMap.key -> (unit -> unit) -> unit

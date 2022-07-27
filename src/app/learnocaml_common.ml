@@ -951,6 +951,23 @@ module Editor_button (E : Editor_info) = struct
          Ace.set_contents E.ace template);
     Lwt.return ()
 
+  (* New button : load draft in editor *)
+  let load_draft draft =
+    editor_button
+    ~icon: "up" [%i"Draft"] (* Need better name and translation *)
+    @@ fun () ->
+      Ace.set_contents E.ace draft;
+      Lwt.return ()
+
+    (* New button : load grade in editor *)
+    (* Not working, curently loading draft like "load_draft" above *)
+    let load_grade grade =
+      editor_button
+      ~icon: "up" [%i"Grade"] (* Need better name and translation *)
+      @@ fun () -> 
+        Ace.set_contents E.ace grade;
+        Lwt.return () 
+
   let download id =
     editor_button
       ~icon: "download" [%i"Download"] @@ fun () ->
