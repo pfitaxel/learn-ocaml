@@ -376,8 +376,7 @@ module Conversions (Json: JSON_CODEC) = struct
 
       | Set_nickname _ -> json J.unit
 
-      | Invalid_request _ ->
-          str
+      | Invalid_request _ -> str
 
   let response_encode r = fst (response_codec r)
   let response_decode r = snd (response_codec r)
@@ -411,7 +410,7 @@ module Conversions (Json: JSON_CODEC) = struct
                     (match nick with None -> [] | Some n -> [n]))
     | Create_teacher_token (token, nick) ->
         assert (Token.is_teacher token);
-        get ~token ["teacher"; "new"] @
+        get ~token (["teacher"; "new"] @
           (match nick with None -> [] | Some n -> [n]))
     | Create_user (email, nick, passwd, secret_candidate) ->
         post (["sync"; "new_user"])
