@@ -14,64 +14,6 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: File "src/grader/learnocaml_report.ml", line 240, characters 50-66 595,
-#: 59-75
-msgid "(minimum mark)"
-msgstr "(note minimale)"
-
-#: File "src/grader/learnocaml_report.ml", line 250, characters 55-74
-msgid "Completed, %d pts"
-msgstr "Terminé, %d pts"
-
-#: File "src/grader/learnocaml_report.ml", line 254, characters 38-46 258,
-#: 67-75
-msgid "Failed"
-msgstr "Échoué"
-
-#: File "src/grader/learnocaml_report.ml", line 262, characters 55-75
-msgid "Incomplete, %d pts"
-msgstr "Incomplet, %d pts"
-
-#: File "src/grader/learnocaml_report.ml", line 287, characters 26-43
-msgid "Exercise failed"
-msgstr "Exercice échoué"
-
-#: File "src/grader/learnocaml_report.ml", line 289, characters 31-37
-msgid "0 pt"
-msgstr "0 pt"
-
-#: File "src/grader/learnocaml_report.ml", line 291, characters 26-45
-msgid "Exercise complete"
-msgstr "Exercice terminé"
-
-#: File "src/grader/learnocaml_report.ml", line 293, characters 49-57 297,
-msgid "%d pts"
-msgstr "%d pts"
-
-#: File "src/grader/learnocaml_report.ml", line 295, characters 26-47
-msgid "Exercise incomplete"
-msgstr "Exercice incomplet"
-
-#: File "src/grader/learnocaml_report.ml", line 563, characters 56-78
-msgid "@[<v 2>Failure: %a@]"
-msgstr "@[<v 2>Échec: %a@]"
-
-#: File "src/grader/learnocaml_report.ml", line 564, characters 56-78
-msgid "@[<v 2>Warning: %a@]"
-msgstr "@[<v 2>Avertissement: %a@]"
-
-#: File "src/grader/learnocaml_report.ml", line 566, characters 58-82
-msgid "@[<v 2>Important: %a@]"
-msgstr "@[<v 2>Important: %a@]"
-
-#: File "src/grader/learnocaml_report.ml", line 567, characters 58-83
-msgid "@[<v 2>Success %d: %a@]"
-msgstr "@[<v 2>Réussite %d: %a@]"
-
-#: File "src/grader/learnocaml_report.ml", line 568, characters 58-83
-msgid "@[<v 2>Penalty %d: %a@]"
-msgstr "@[<v 2>Pénalité %d: %a@]"
-
 #: File "src/app/learnocaml_common.ml", line 71, characters 21-37
 msgid "INTERNAL ERROR"
 msgstr "ERREUR INTERNE"
