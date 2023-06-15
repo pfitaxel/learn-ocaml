@@ -1,4 +1,5 @@
 open Js_of_ocaml
+open Js_of_ocaml_tyxml
 open Js_utils
 open Lwt.Infix
 open Learnocaml_common
@@ -27,12 +28,12 @@ let get_encoded_token () =
   | exception Not_found ->
      match arg "token1" with (* encoding algo 1: space-padded token |> base64 *)
      | raw_arg ->
-        begin match B64.decode_opt (*~pad:true*) raw_arg with
+        begin match Base64.decode ~pad:true raw_arg with
         (* ~pad:false would work also, but ~pad:true is stricter *)
-        | Some pad_token ->
+        | Ok pad_token ->
            Some { arg_name = "token1"; raw_arg;
                   token = Learnocaml_data.Token.parse (String.trim pad_token) }
-        | None -> failwith "B64: error"
+        | Error (`Msg msg) -> failwith msg
         end
      | exception Not_found -> None
 

@@ -14,10 +14,11 @@ on:
 jobs:
   build_test_server:
     name: Build learn-ocaml and run tests
+    if: ${{ github.event_name != 'schedule' || github.repository == 'ocaml-sf/learn-ocaml' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Build Docker images
         run: "make docker-images"
       - name: Run learn-ocaml build on demo-repository
@@ -29,18 +30,20 @@ jobs:
 
   client_using_other_server:
     name: Build learn-ocaml-client and run quick tests
+    if: ${{ github.event_name != 'schedule' || github.repository == 'ocaml-sf/learn-ocaml' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         server_image:
           - 'ocamlsf/learn-ocaml:0.12'
+          - 'ocamlsf/learn-ocaml:0.13.0'
           - 'learn-ocaml'  # use learn-ocaml image built from master
     env:
       USE_CLIENT_IMAGE: 'true'
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Build Docker images
         run: "make docker-images"
       - name: Pull server_image
@@ -53,15 +56,17 @@ jobs:
 
   build_extra_tests:
     name: Run dockerized tests
+    if: ${{ github.event_name != 'schedule' || github.repository == 'ocaml-sf/learn-ocaml' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         dockerfile:
           - 'Dockerfile.test-client'
+          - 'Dockerfile.test-server'
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Run docker build
         run: 'file=${{ matrix.dockerfile }} && docker build -t "learn-ocaml-${file#*.}" -f "$file" .'
 

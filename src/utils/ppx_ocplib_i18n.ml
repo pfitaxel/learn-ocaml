@@ -101,9 +101,13 @@ let dump_pot () =
           Format.pp_print_string fmt "#:";
           List.iter (fun l ->
               Format.pp_print_char fmt ' ';
-              Location.print_compact fmt l)
+              Location.print_loc fmt l)
             locs;
-          Format.fprintf fmt "\nmsgid %S\n" s;
+          Format.fprintf fmt "\nmsgid \"%s\"\n"
+            Re.(s |>
+                replace_string (compile (char '\\')) ~by:"\\\\" |>
+                replace_string (compile (char '"')) ~by:"\\\"" |>
+                replace_string (compile (char '\n')) ~by:"\\n");
           Format.fprintf fmt "msgstr \"\"\n\n";
         ) misses;
       close_out oc

@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -29,7 +29,7 @@ module type COMPAT = sig
 
   val to_string : t -> string
 
-  (** Supported formats: [Compat.v "str"] where "str" is
+  (** Supported formats: [Compat.v "str"] where "str" is nonempty and
       either "n", "-n" (a signed integer), or "n.str".
       However, [Compat.v "0.14.rc1"] or so is not supported for now. *)
   val v : string -> t
@@ -58,24 +58,24 @@ in the same codebase, so it's easier to update both of them in one go.
 
 But this tight coupling meant that a learn-ocaml-client version would
 only be compatible with a single server version, hence a frequent but
-annoying error "API version mismatch: client v._ and server v._".
+annoying error "API version mismatch: client v.x and server v.y".
 
-So since learn-ocaml 0.13, a given client_version will try to be
-compatible with as much server_version's as possible (>= 0.12 &
-<= client_version).
+So since learn-ocaml 0.13.0, a given client_version will try to be
+compatible with as much server_version's as possible such that
+[client_version >= server_version && server_version >= "0.12"].
 
-To this aim, each [request] constructor is annotated with a version
-constraint of type [Compat.t], see [supported_versions].
+To this aim, each [request] constructor comes with a version
+constraint of type [Compat.pred], see [supported_versions].
 
 Regarding the inevitable extensions of the API:
 
-- make sure one only adds constructors to this [request] type,
+- make sure we only add constructors to this [request] type,
 - and that their semantics does not change
   (or at least in a backward-compatible way;
    see PR https://github.com/ocaml-sf/learn-ocaml/pull/397
-   for a counter-example)
+   for a counter-example);
 - but if a given entrypoint would need to be removed,
-  rather add a Compat.Upto (*<*) constraint.
+  add a [Compat.Upto] constraint (*<*) instead.
  *)
 type _ request =
   | Static:
@@ -87,7 +87,7 @@ type _ request =
   | Create_token:
       string * student token option * string option -> student token request
   | Create_teacher_token:
-      teacher token -> teacher token request
+      teacher token * string option -> teacher token request
   | Create_user:
       string * string * string * string -> unit request
   | Login:
@@ -197,7 +197,7 @@ type _ request =
 val supported_versions: 'a request -> Compat.pred
 
 (** [is supported client server req] = Ok () if
-    [server <= client && current "supports" req && server "supports" client] *)
+    [server <= client && "client supports req" && "server supports req"] *)
 val is_supported:
   ?current:Compat.t -> server:Compat.t ->
   'resp request -> (unit, string) result
@@ -223,7 +223,7 @@ module type REQUEST_HANDLER = sig
                 Learnocaml_data.Server.config -> http_request -> 'resp request -> 'resp ret
 end
 
-module Server: functor (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) -> sig
+module Server: functor (_: JSON_CODEC) (Rh: REQUEST_HANDLER) -> sig
 
   (** Helper to define a server: handles recognition of the incoming request, and
       encoding of the response. *)
@@ -232,7 +232,7 @@ module Server: functor (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) -> sig
 
 end
 
-module Client: functor (Json: JSON_CODEC) -> sig
+module Client: functor (_: JSON_CODEC) -> sig
 
   (** Helper to make a client request: handles encoding of the request and
       decoding of the response. *)

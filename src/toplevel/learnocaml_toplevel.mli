@@ -1,14 +1,14 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
 (** An OCaml toplevel whose input and output will be in a given HTML [div]. *)
 
-open Tyxml_js
+open Js_of_ocaml_tyxml.Tyxml_js
 
 (** An abstract type representing a toplevel instance. *)
 type t
@@ -53,7 +53,7 @@ type t
      the previous outputs are kept and marked as old
      (see {!Learnocaml_toplevel_output.oldify}). Otherwise, the output console is cleaned.
    @param input_sizing
-     See (!Learnocaml_toplevel_input.sizing}.
+     See {!Learnocaml_toplevel_input.sizing}.
    @param history
      The history storage to use. If none, a new volatile one is created.
    @param display_welcome
@@ -99,12 +99,12 @@ val make_flood_popup:
     @param timeout
       See {!create}.
     @returns
-      Returns [Success true] whenever the code was correctly
-      typechecked and its evaluation did not raise an exception nor
-      timeouted and [false] otherwise. *)
+      Returns [errors, warnings, success]. [success] is true whenever the code
+      was correctly typechecked and its evaluation did not raise an exception
+      nor timeouted and [false] otherwise. *)
 val execute_phrase: t ->
   ?timeout:(t -> unit Lwt.t) ->
-  string -> bool Lwt.t
+  string -> (Location.report option * Location.report list * bool) Lwt.t
 
 (** Execute a given piece of code without displaying it.
 
@@ -114,7 +114,7 @@ val execute_phrase: t ->
       Tells if answers of the toplevel are to be displayed.
     @param message
       Displays [(* message *)] where the code should have been echoed.
-    @returns
+    @return
        Returns [Success true] whenever the code was correctly
        typechecked and its evaluation did not raise an exception nor
        timeouted and [false] otherwise. *)
@@ -138,12 +138,12 @@ val clear: t -> unit
 val reset: t -> unit Lwt.t
 
 (** Print a message in the toplevel standard output. This is equivalent
-    to calling [Pervasives.print_string] in the toplevel session.
+    to calling [Stdlib.print_string] in the toplevel session.
     Calls {!Learnocaml_toplevel_output.output_stdout}. *)
 val print_string: t -> string -> unit
 
 (** Print a message in the toplevel standard error output. This is
-    equivalent to calling [Pervasives.prerr_string] in the toplevel
+    equivalent to calling [Stdlib.prerr_string] in the toplevel
     session. Calls {!Learnocaml_toplevel_output.output_stderr}. *)
 val prerr_string: t -> string -> unit
 
@@ -152,7 +152,7 @@ val prerr_string: t -> string -> unit
 val print_html: t -> string -> unit
 
 (** scroll the view to show the last phrase.
-    Calls {!Learnocaml_toplevel_output.scroll. *)
+    Calls {!Learnocaml_toplevel_output.scroll}. *)
 val scroll: t -> unit
 
 (** Execute the content of the input [textarea].

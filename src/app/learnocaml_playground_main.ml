@@ -1,12 +1,13 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
 open Js_of_ocaml
+open Js_of_ocaml_tyxml
 open Js_utils
 open Lwt.Infix
 open Learnocaml_common
@@ -26,8 +27,12 @@ let main () =
   disable_button_group toplevel_buttons_group (* enabled after init *) ;
   let toplevel_toolbar = find_component "learnocaml-exo-toplevel-toolbar" in
   let editor_toolbar = find_component "learnocaml-exo-editor-toolbar" in
-  let toplevel_button =
-    button ~container: toplevel_toolbar ~theme: "dark" ~group:toplevel_buttons_group ?state:None in
+  let toplevel_button ~icon label cb =
+    ignore @@
+      button
+        ~icon ~container: toplevel_toolbar
+        ~theme: "dark" ~group:toplevel_buttons_group ?state:None label cb
+  in
   let id = match Url.Current.path with
     | "" :: "playground" :: p | "playground" :: p ->
         String.concat "/" (List.map Url.urldecode (List.filter ((<>) "") p))

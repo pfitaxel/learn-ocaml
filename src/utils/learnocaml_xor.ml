@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -40,6 +40,6 @@ let xor ?prefix str =
   done;
   Bytes.to_string str'
 
-let alphabet = Bytes.to_string alphabet
-let decode ?prefix str = xor ?prefix @@ B64.decode ~alphabet str
-let encode ?prefix str = B64.encode ~alphabet @@ xor ?prefix str
+let alphabet = Base64.make_alphabet (Bytes.to_string alphabet)
+let decode ?prefix str = xor ?prefix @@ (Base64.decode ~alphabet str |> Result.get_ok)
+let encode ?prefix str = Base64.encode ~alphabet @@ xor ?prefix str |> Result.get_ok

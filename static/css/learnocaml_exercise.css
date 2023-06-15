@@ -69,6 +69,33 @@ body {
     top: 61px;
   }
 }
+/* ---------------- drop up menu ---------------- */
+
+.dropup_content {
+    display: none;
+    position: absolute;
+    bottom: 40px;
+    z-index: 100;
+    background-color: #666;
+    box-shadow: 0 0 10px 2px rgba(0,0,0,0.4);
+    width: max-content;
+    transition: all .3s ease .15s; /* optional */
+}
+
+.dropup_content ul {
+    list-style-type: none;
+    padding: 0px;
+    margin: 0px;
+}
+.dropup_content li {
+    padding: 5px 10px;
+    font-size: 16px;
+}
+.dropup_content li:hover {
+    background-color: rgba(170,204,255,0.5);
+    cursor: pointer;
+}
+
 /* -------------------- tabs and tab buttons ---------------------- */
 #learnocaml-exo-tab-buttons {
   position: absolute;
@@ -306,7 +333,7 @@ body {
 /* -------------------- toplevel tab ------------------------------ */
 #learnocaml-exo-tab-toplevel > .toplevel-pane {
   position: absolute;
-  left: 0; top: 0; bottom: 0px; width: 100%;
+  left: 0; top: 0; bottom: 40px; width: 100%;
   z-index: 1002;
   margin: 5px 0 0 0;
 }
@@ -318,25 +345,23 @@ body {
 }
 #learnocaml-exo-tab-toplevel > .buttons {
   position: absolute;
-  right: 1%; top: 5px; width: 49%; height: 40px;
+  left: 0; bottom: 0px; width: 100%; height: 39px;
   background: linear-gradient(to bottom, #fff 0px, #ddd 10px, #aaa 60px);
   color: #fff;
   line-height: 40px;
   display: flex;
-  flex-direction: row;
+  flex-direction: row-reverse;
   z-index: 1003;
+  border-top: 1px #000 solid;
 }
 #learnocaml-exo-tab-toplevel > .buttons > button {
-  flex: 1;
+  flex: 0 0.33 200px;
   background: none;
   border: none;
   color: #222;
   text-shadow: 2px 2px 5px rgba(0,0,0,0.2);
-  border-top: 1px #666 solid;
   position: relative;
   padding: 0;
-}
-#learnocaml-exo-tab-toplevel > .buttons > button:not(:first-child) {
   border-left: 1px #666 solid;
 }
 @media (max-width: 550px) {

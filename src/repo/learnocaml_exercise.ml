@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -238,7 +238,7 @@ module File = struct
         | Some id, None | None, Some id -> return id
         | Some id, Some id' ->
             if id = id' then return id else
-              fail (Failure "Exercise.read: conficting ids")
+              fail (Failure "Exercise.read: conflicting ids")
       end >>= fun ex_id ->
       ex := set id ex_id !ex ;
       (* read_field meta.key >>=

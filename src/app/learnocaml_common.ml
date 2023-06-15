@@ -1,12 +1,14 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2022 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
 open Js_of_ocaml
+open Js_of_ocaml_tyxml
+open Js_of_ocaml_lwt
 open Js_utils
 open Lwt.Infix
 open Learnocaml_data
@@ -149,19 +151,25 @@ let confirm ~title ?(ok_label=[%i"OK"]) ?(cancel_label=[%i"Cancel"]) contents f 
     close_button cancel_label;
   ]
 
-let ask_string ~title ?(ok_label=[%i"OK"]) ?(cancel_label=Some [%i"Cancel"]) contents =
+let ask_string ~title ?(ok_label=[%i"OK"]) ?(may_cancel=true) contents =
   let input_field =
     H.input ~a:[
         H.a_input_type `Text;
       ] ()
   in
   let result_t, up = Lwt.wait () in
+  let validate _ =
+    Lwt.wakeup up @@ Manip.value input_field
+  in
+  Manip.Ev.onreturn input_field validate;
   let buttons =
-    box_button ok_label (fun () -> Lwt.wakeup up @@ Manip.value input_field) ::
-    match cancel_label with
-    | Some label -> [box_button label (fun () -> Lwt.fail_with "Cancelled by user")]
-    | _ -> [] in
+    box_button ok_label validate
+    :: (if may_cancel
+        then [close_button [%i"Cancel"]]
+        else [])
+  in
   ext_alert ~title (contents @ [input_field]) ~buttons;
+  Manip.focus input_field;
   result_t
 
 let default_exn_printer = function
@@ -292,13 +300,13 @@ let disable_with_button_group component (buttons, _, _) =
     ((component :> < disabled : bool Js.t Js.prop > Js.t), ref false)
     :: !buttons
 
-let button ~container ~theme ?group ?state ~icon lbl cb =
+let button ?id ~container ~theme ?group ?state ~icon lbl cb =
   let (others, mutex, cnt) as group =
     match group with
     | None -> button_group ()
     | Some group -> group in
   let button =
-    H.(button [
+    H.(button ~a:(match id with Some id -> [ H.a_id id ] | _ -> []) [
         img ~alt:"" ~src:(api_server ^ "/icons/icon_" ^ icon ^ "_" ^ theme ^ ".svg") () ;
         txt " " ;
         span ~a:[ a_class [ "label" ] ] [ txt lbl ]
@@ -345,6 +353,32 @@ let dropdown ~id ~title items =
         (title @ [H.txt " \xe2\x96\xb4" (* U+25B4 *)]);
       H.div ~a: [H.a_id id; H.a_class ["dropdown_content"]] items
     ]
+
+let button_dropup ~container ~theme ?state ~icon ~id_menu ~items lbl cb_before =
+  let btn_id = id_menu ^ "-btn" in (* assumed to be unique *)
+  let toggle cb_before () =
+    let menu = find_component id_menu in
+    let disp =
+      match Manip.Css.display menu with
+      | "block" -> "none"
+      | _ ->
+         Lwt.dont_wait (fun () -> cb_before ()) (fun _exc -> ());
+         Lwt_js_events.async (fun () ->
+             Lwt_js_events.click window >|= fun ev ->
+             Js.Opt.case ev##.target (fun () -> ())
+               (fun e ->
+                 if Js.to_string e##.id <> btn_id then
+                   Manip.SetCss.display menu "none"));
+         "block"
+    in
+    Manip.SetCss.display menu disp;
+    Lwt.return_unit
+  in
+  let cb = toggle cb_before in
+  let div_content =
+    H.div ~a: [H.a_id id_menu; H.a_class ["dropup_content"]] items in
+  button ~id:btn_id ~container:container ~theme ?state ~icon lbl cb ;
+  Manip.appendChild container div_content
 
 let gettimeofday () =
   (new%js Js.date_now)##getTime /. 1000.
@@ -400,6 +434,8 @@ let set_state_from_save_file ?token save =
   let open Learnocaml_local_storage in
   (match token with None -> () | Some t -> store sync_token t);
   store nickname save.nickname;
+  store all_graded_solutions
+    (SMap.map (fun ans -> ans.Answer.solution) save.all_exercise_states);
   store all_exercise_states
     (SMap.merge (fun _ ans edi ->
          match ans, edi with
@@ -443,10 +479,13 @@ let get_state_as_save_file ?(include_reports = false) () =
     all_exercise_toplevel_histories = retrieve all_exercise_toplevel_histories;
   }
 
-let rec sync_save token save_file =
+let rec sync_save token save_file on_sync =
   Server_caller.request (Learnocaml_api.Update_save (token, save_file))
   >>= function
-  | Ok save -> set_state_from_save_file ~token save; Lwt.return save
+  | Ok save ->
+     set_state_from_save_file ~token save;
+     on_sync ();
+     Lwt.return save
   | Error (`Not_found _) ->
       Server_caller.request_exn
         (Learnocaml_api.Create_token ("", Some token, None)) >>= fun _token ->
@@ -454,19 +493,20 @@ let rec sync_save token save_file =
       Server_caller.request_exn
         (Learnocaml_api.Update_save (token, save_file)) >>= fun save ->
       set_state_from_save_file ~token save;
+      on_sync ();
       Lwt.return save
   | Error e ->
       lwt_alert ~title:[%i"SYNC FAILED"] [
         H.p [H.txt [%i"Could not synchronise save with the server"]];
         H.code [H.txt (Server_caller.string_of_error e)];
       ] ~buttons:[
-        [%i"Retry"], (fun () -> sync_save token save_file);
-        [%i"Ignore"], (fun () -> Lwt.return save_file);
+          [%i"Retry"], (fun () -> sync_save token save_file on_sync);
+          [%i"Ignore"], (fun () -> Lwt.return save_file);
       ]
 
-let sync token = sync_save token (get_state_as_save_file ())
+let sync token on_sync = sync_save token (get_state_as_save_file ()) on_sync
 
-let sync_exercise token ?answer ?editor id =
+let sync_exercise token ?answer ?editor id on_sync =
   let handle_serverless () =
     (* save the text at least locally (but not the report & grade, that could
        be misleading) *)
@@ -503,12 +543,13 @@ let sync_exercise token ?answer ?editor id =
   } in
   match token with
   | Some token ->
-     Lwt.catch (fun () -> sync_save token save_file)
+     Lwt.catch (fun () -> sync_save token save_file on_sync)
        (fun e ->
          handle_serverless ();
          raise e)
   | None -> set_state_from_save_file save_file;
             handle_serverless ();
+            on_sync ();
             Lwt.return save_file
 
 let string_of_seconds seconds =
@@ -883,7 +924,11 @@ end
 
 module Editor_button (E : Editor_info) = struct
 
-  let editor_button = button ~container:E.buttons_container ~theme:"light"
+  let editor_button =
+    button ~container:E.buttons_container ~theme:"light"
+
+  let editor_button_dropup =
+    button_dropup ~container:E.buttons_container ~theme:"light"
 
   let cleanup template =
   editor_button
@@ -894,6 +939,81 @@ module Editor_button (E : Editor_info) = struct
          Ace.set_contents E.ace template);
     Lwt.return ()
 
+  let reload token id template =
+    let rec fetch_draft_solution tok () =
+      match tok with
+      | token ->
+         Server_caller.request (Learnocaml_api.Fetch_save token) >>= function
+         | Ok save ->
+            set_state_from_save_file ~token save;
+            Lwt.return_some (save.Save.nickname)
+         | Error (`Not_found _) ->
+            alert ~title:[%i"TOKEN NOT FOUND"]
+              [%i"The entered token couldn't be recognised."];
+            Lwt.return_none
+         | Error e ->
+            lwt_alert ~title:[%i"REQUEST ERROR"] [
+                H.p [H.txt [%i"Could not retrieve data from server"]];
+                H.code [H.txt (Server_caller.string_of_error e)];
+              ] ~buttons:[
+                [%i"Retry"], (fun () -> fetch_draft_solution tok ());
+                [%i"Cancel"], (fun () -> Lwt.return_none);
+              ]
+    in
+    let id_menu = "reload-button-dropup" in (* assumed to be unique *)
+    editor_button_dropup
+      ~icon: "down"
+      ~id_menu
+      ~items: [
+        H.ul [
+            H.li ~a: [ H.a_id (id_menu ^ "-graded"); H.a_onclick (fun _ ->
+                confirm ~title:[%i"Reload latest graded code"]
+                  [H.txt [%i"This will replace your code with your last graded code. Are you sure?"]]
+                  (fun () ->
+                    let graded = Learnocaml_local_storage.(retrieve (graded_solution id)) in
+                    Ace.set_contents E.ace graded; Ace.focus E.ace) ; true) ]
+              [ H.txt [%i"Reload latest graded code"] ];
+
+            H.li ~a: [ H.a_id (id_menu ^ "-draft"); H.a_onclick (fun _ ->
+                confirm ~title:[%i"Reload latest saved draft"]
+                  [H.txt [%i"This will replace your code with your last saved draft. Are you sure?"]]
+                  (fun () ->
+                    let draft = Learnocaml_local_storage.(retrieve (exercise_state id)).Answer.solution in
+                    Ace.set_contents E.ace draft; Ace.focus E.ace) ; true) ]
+              [ H.txt [%i"Reload latest saved draft"] ];
+
+            H.li ~a: [ H.a_onclick (fun _ ->
+                confirm ~title:[%i"START FROM SCRATCH"]
+                  [H.txt [%i"This will discard all your edits. Are you sure?"]]
+                  (fun () ->
+                    Ace.set_contents E.ace template; Ace.focus E.ace) ; true) ]
+              [ H.txt [%i"Reset to initial template"] ];
+          ]
+      ]
+      [%i"Reload"] @@ fun () ->
+        token >>= function
+          None ->
+          (* We may want to only show "Reset to initial template" in this case,
+             though there is already this code in learnocaml_exercise_main.ml:
+             {| if has_server then EB.reload ... else EB.cleanup ... |}. *)
+           Lwt.return_unit
+        | Some tok ->
+           let found f =
+               match f () with
+               | _val -> true
+               | exception Not_found -> false
+           in
+           fetch_draft_solution tok () >|= fun _save ->
+           let menu_draft = find_component (id_menu ^ "-draft") in
+           Manip.SetCss.display menu_draft
+             (if found (fun () ->
+                     Learnocaml_local_storage.(retrieve (exercise_state id)).Answer.solution)
+              then "" else "none");
+           let menu_graded = find_component (id_menu ^ "-graded") in
+           Manip.SetCss.display menu_graded
+             (if found (fun () ->
+                     Learnocaml_local_storage.(retrieve (graded_solution id)))
+              then "" else "none")
   let download id =
     editor_button
       ~icon: "download" [%i"Download"] @@ fun () ->
@@ -905,22 +1025,36 @@ module Editor_button (E : Editor_info) = struct
   let eval top select_tab =
     editor_button
       ~icon: "run" [%i"Eval code"] @@ fun () ->
+      Learnocaml_toplevel.reset top >>= fun () ->
       Learnocaml_toplevel.execute_phrase top (Ace.get_contents E.ace) >>= fun _ ->
       select_tab "toplevel";
       Lwt.return_unit
 
-  let sync token id =
-    editor_button
+  let sync token id on_sync =
+    let state = button_state () in
+    (editor_button
+      ~state
       ~icon: "sync" [%i"Sync"] @@ fun () ->
       token >>= fun token ->
-      sync_exercise token id ~editor:(Ace.get_contents E.ace) >|= fun _save -> ()
+      sync_exercise token id ~editor:(Ace.get_contents E.ace) on_sync
+      >|= fun _save -> ());
+    Ace.register_sync_observer E.ace (fun sync ->
+        (* this is run twice when clicking on Reset, because of Ace's implem *)
+        if sync then disable_button state else enable_button state);
+    (* Disable the Sync button at loading time: *)
+    Ace.set_synchronized E.ace
+
 end
 
 let setup_editor solution =
   let editor_pane = find_component "learnocaml-exo-editor-pane" in
-  let editor = Ocaml_mode.create_ocaml_editor (Tyxml_js.To_dom.of_div editor_pane) in
+  let editor =
+    Ocaml_mode.create_ocaml_editor
+      (Tyxml_js.To_dom.of_div editor_pane)
+  in
   let ace = Ocaml_mode.get_editor editor in
   Ace.set_contents ace ~reset_undo:true solution;
+  (* "Ace.set_synchronized ace" done after "Ace.register_sync_observer" above *)
   Ace.set_font_size ace 18;
   editor, ace
 
@@ -929,20 +1063,24 @@ let typecheck top ace editor set_class =
   let error, warnings =
     match res with
     | Toploop_results.Ok ((), warnings) -> None, warnings
-    | Toploop_results.Error (err, warnings) -> Some err, warnings in
-  let transl_loc { Toploop_results.loc_start ; loc_end } =
-    { Ocaml_mode.loc_start ; loc_end } in
+    | Toploop_results.Error (err, warnings) -> Some err, warnings
+  in
+  let lexing_to_licol loc =
+    Lexing.(loc.pos_lnum, loc.pos_cnum - loc.pos_bol);
+  in
+  let transl_loc { Warnings.loc_start ; loc_end ; loc_ghost = _} =
+    { Ace.loc_start = lexing_to_licol loc_start;
+      Ace.loc_end = lexing_to_licol loc_end }
+  in
+  let transl (err0,errs) =
+    List.map (fun (loc, msg) -> {Ocaml_mode.msg; loc = transl_loc loc})
+      (err0::errs)
+  in
   let error = match error with
     | None -> None
-    | Some { Toploop_results.locs ; msg ; if_highlight } ->
-       Some { Ocaml_mode.locs = List.map transl_loc locs ;
-              msg = (if if_highlight <> "" then if_highlight else msg) } in
-  let warnings =
-    List.map
-      (fun { Toploop_results.locs ; msg ; if_highlight } ->
-        { Ocaml_mode.loc = transl_loc (List.hd locs) ;
-          msg = (if if_highlight <> "" then if_highlight else msg) })
-      warnings in
+    | Some err -> Some (transl err)
+  in
+  let warnings = List.map (fun warn -> transl warn) warnings in
   Ocaml_mode.report_error ~set_class editor error warnings >|= fun () ->
   Ace.focus ace
 
@@ -1034,17 +1172,21 @@ let get_token ?(has_server = true) () =
     try
       Some Learnocaml_local_storage.(retrieve sync_token) |>
         Lwt.return
-    with Not_found ->
-      retrieve (Learnocaml_api.Nonce ())
-      >>= fun nonce ->
-      ask_string ~title:"Secret" ~cancel_label:None
-        [H.txt [%i"Enter the secret"]]
-      >>= fun secret ->
-      retrieve
-        (Learnocaml_api.Create_token (Sha.sha512 (nonce ^ Sha.sha512 secret), None, None))
-      >|= fun token ->
-      Learnocaml_local_storage.(store sync_token) token;
-      Some token
+    with
+    Not_found ->
+      ask_string ~title:"Token" ~may_cancel:false
+        [H.txt [%i"Enter your token"]]
+      >>= fun input_tok ->
+      let token = Token.parse (input_tok) in
+        Server_caller.request (Learnocaml_api.Fetch_save token)
+        >>= function
+        | Ok save ->
+            set_state_from_save_file ~token save;
+            Lwt.return_some token
+        | _ ->
+            alert ~title:[%i"TOKEN NOT FOUND"]
+              [%i"The entered token couldn't be recognised."];
+            Lwt.return_none
 
 module Display_exercise =
   functor (

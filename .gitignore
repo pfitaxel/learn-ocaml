@@ -6,14 +6,10 @@ _opam
 .opam-switch
 Makefile.local
 docker/
-src/ppx-metaquot/ast_lifter.ml
 
 learnocaml-server.byte
 learn-ocaml.install
 learn-ocaml-client.install
-
-src/grader/embedded_cmis.ml
-src/grader/embedded_grading_cmis.ml
 
 demo-repository/exercises/*.stderr
 demo-repository/exercises/*.stdout
@@ -38,3 +34,5 @@ translations/*.pot
 tests/corpuses/*
 
 detect-libs.*
+
+docs/odoc.html

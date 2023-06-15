@@ -1,12 +1,13 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
 open Lwt.Infix
+open Cmdliner
 
 module StringSet = Set.Make(String)
 
@@ -24,7 +25,6 @@ let readlink f =
   with Sys_error _ -> Sys.chdir (Filename.get_temp_dir_name ()); f
 
 module Args = struct
-  open Cmdliner
   open Arg
 
   type command = Grade | Build | Serve
@@ -37,19 +37,21 @@ module Args = struct
       ]) [Build; Serve] &
     info [] ~docs:"COMMANDS" ~docv:"COMMAND"
 
+  let docs = Manpage.s_common_options
+
   let repo_dir =
-    value & opt dir "." & info ["repo"] ~docv:"DIR" ~doc:
+    value & opt dir "." & info ["repo"] ~docs ~docv:"DIR" ~doc:
       "The path to the repository containing the exercises, lessons and \
        tutorials."
 
   let app_dir =
-    value & opt string "./www" & info ["app-dir"; "o"] ~docv:"DIR" ~doc:
+    value & opt string "./www" & info ["app-dir"; "o"] ~docs ~docv:"DIR" ~doc:
       "Directory where the app should be generated for the $(i,build) command, \
        and from where it is served by the $(i,serve) command."
 
   let base_url =
     value & opt string "" &
-      info ["base-url"] ~docv:"BASE_URL" ~env:(Arg.env_var "LEARNOCAML_BASE_URL") ~doc:
+      info ["base-url"] ~docs ~docv:"BASE_URL" ~env:(Cmd.Env.info "LEARNOCAML_BASE_URL") ~doc:
         "Set the base URL of the website. \
          Should not end with a trailing slash. \
          Currently, this has no effect on the backend - '$(b,learn-ocaml serve)'. \
@@ -155,14 +157,18 @@ module Args = struct
       value & opt dir default & info ["contents-dir"] ~docv:"DIR" ~doc:
         "directory containing the base learn-ocaml app contents"
 
-    let enable opt doc =
+    (** [enable "opt" ~old["old";"very old"](*backward-compat opts*) "the.."] *)
+    let enable opt ?(old: string list = []) doc =
+      let f_on_off opt = ("enable-"^opt, "disable-"^opt) in
+      let on_opt, off_opt =
+        List.split (List.map f_on_off (opt :: old)) in
       value & vflag None [
-        Some true, info ["enable-"^opt] ~doc:("Enable "^doc);
-        Some false, info ["disable-"^opt] ~doc:("Disable "^doc);
+        Some true, info on_opt ~doc:("Enable "^doc);
+        Some false, info off_opt ~doc:("Disable "^doc);
       ]
 
-    let try_ocaml = enable "tryocaml"
-        "the 'TryOCaml' tab (enabled by default if the repository contains a \
+    let try_ocaml = enable "tutorials" ~old:["tryocaml"]
+        "the 'Tutorials' tab (enabled by default if the repository contains a \
          $(i,tutorials) directory)"
 
     let playground = enable "playground"
@@ -227,8 +233,8 @@ module Args = struct
   end
 
   module Server = struct
-    include Learnocaml_server_args
-    let info = info ~docs:"SERVER OPTIONS"
+    module Args = Learnocaml_server_args.Args(struct let section = "SERVER OPTIONS" end)
+    include Args
   end
 
   type t = {
@@ -251,10 +257,18 @@ end
 open Args
 
 let process_html_file orig_file dest_file base_url no_secret =
+  let add_prefix_unless_http prefix url =
+    let https = "https://" and http = "http://" in
+    let starts_with proto =
+      String.(sub url 0 (min (length proto) (length url))) = proto in
+    if starts_with https || starts_with http then url
+    else prefix ^ url in
   let transform_tag e tag attrs attr =
     let attr_pair = ("", attr) in
     match List.assoc_opt attr_pair attrs with
-    | Some url -> `Start_element ((e, tag), (attr_pair, base_url ^ url) :: (List.remove_assoc attr_pair attrs))
+    | Some url -> `Start_element ((e, tag),
+                                  (attr_pair, add_prefix_unless_http base_url url)
+                                  :: (List.remove_assoc attr_pair attrs))
     | None -> `Start_element ((e, tag), attrs) in
   Lwt_io.open_file ~mode:Lwt_io.Input orig_file >>= fun ofile ->
   Lwt_io.open_file ~mode:Lwt_io.Output dest_file >>= fun wfile ->
@@ -367,7 +381,7 @@ let main o =
          (fun oc ->
             Lwt_io.fprintf oc
               "var learnocaml_config = {\n\
-              \  enableTryocaml: %b,\n\
+              \  enableTutorials: %b,\n\
               \  enablePlayground: %b,\n\
               \  enableLessons: %b,\n\
               \  enableExercises: %b,\n\
@@ -425,11 +439,13 @@ let main o =
   in
   exit ret
 
-let man = [
-  `S "DESCRIPTION";
+let man = 
+  let open Manpage in
+  [
+  `S s_description;
   `P "This program performs various tasks related to generating, serving and \
       administrating a learn-ocaml web-app.";
-  `S "COMMANDS";
+  `S s_commands;
   `P "The $(i,COMMAND) argument may be one or more of the following. If no \
       command is specified, '$(b,build) $(b,serve)' is assumed.";
   `I ("$(b,grade)", "Runs the automatic grader on exercise solutions.");
@@ -438,36 +454,48 @@ let man = [
                      $(b,REPOSITORY FORMAT)).");
   `I ("$(b,serve)", "Run a web-server providing access to the learn-ocaml app, \
                      as well as user file synchronisation.");
-  `S "OPTIONS";
+  `S s_common_options;
   `S "GRADER OPTIONS";
   `S "BUILDER OPTIONS";
   `S "SERVER OPTIONS";
   `S "REPOSITORY FORMAT";
   `P "The repository specified by $(b,--repo) is expected to contain \
       sub-directories $(b,lessons), $(b,tutorials), $(b,playground) and $(b,exercises).";
-  `S "AUTHORS";
+  `S s_exit_status;
+  `S s_environment;
+  `S s_authors;
   `P "The original authors are Benjamin Canou, \
-      Çağdaş Bozman, Grégoire Henry and Louis Gesbert. It is licensed under \
-      the MIT License.";
-  `S "BUGS";
+      Çağdaş Bozman, Grégoire Henry and Louis Gesbert (OCamlPro). \
+      Learn-OCaml is licensed under the MIT License.";
+  `S s_bugs;
   `P "Bugs should be reported to \
       $(i,https://github.com/ocaml-sf/learn-ocaml/issues)";
 ]
 
-let main_cmd =
-  Cmdliner.Term.(const main $ Args.term),
-  Cmdliner.Term.info
+let exits =
+  let open Cmd.Exit in
+  [ info ~doc:"Default exit." ok
+  ; info ~doc:"Client-side failure whose cause is printed on stderr. Caused by $(b,grade) or $(b,build) commands." 1
+  ; info ~doc:"Uncaught exception." 2
+  ; info ~doc:"Server error whose cause is printed on stderr. Caused by $(b,serve) command." 10
+  ]
+
+let main_info =
+  Cmd.info 
     ~man
+    ~exits
     ~doc:"Learn-ocaml web-app manager"
-    ~version:Learnocaml_api.version
+    ~version:Learnocaml_api.version 
     "learn-ocaml"
+
+let main_term = Term.(const main $ Args.term)
 
 let () =
   match
-    Cmdliner.Term.eval ~catch:false main_cmd
+    Cmd.eval_value ~catch:false (Cmd.v main_info main_term)
   with
   | exception Failure msg ->
       Printf.eprintf "[ERROR] %s\n" msg;
       exit 1
-  | `Error _ -> exit 2
+  | Error _ -> exit 2
   | _ -> exit 0

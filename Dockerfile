@@ -1,15 +1,15 @@
-FROM ocaml/opam:alpine-3.13-ocaml-4.05 as compilation
+FROM ocaml/opam:alpine-3.13-ocaml-4.12 as compilation
 LABEL Description="learn-ocaml building" Vendor="OCamlPro"
 
-WORKDIR learn-ocaml
+WORKDIR /home/opam/learn-ocaml
 
-COPY learn-ocaml.opam learn-ocaml.opam.locked learn-ocaml-client.opam ./
+COPY learn-ocaml.opam learn-ocaml.opam.locked learn-ocaml-client.opam learn-ocaml-client.opam.locked ./
 RUN sudo chown -R opam:nogroup .
 
 ENV OPAMYES true
 RUN echo 'archive-mirrors: [ "https://opam.ocaml.org/cache" ]' >> ~/.opam/config \
   && opam repository set-url default http://opam.ocaml.org \
-  && opam switch 4.05 \
+  && opam switch 4.12 \
   && echo 'pre-session-commands: [ "sudo" "apk" "add" depexts ]' >> ~/.opam/config \
   && opam install . --deps-only --locked
 
@@ -42,12 +42,7 @@ WORKDIR /learnocaml
 
 COPY --from=compilation /home/opam/install-prefix/bin/learn-ocaml-client /usr/bin
 
-ENTRYPOINT ["dumb-init","learn-ocaml-client"]
-
-LABEL org.opencontainers.image.title="learn-ocaml-client"
-LABEL org.opencontainers.image.description="learn-ocaml command-line client"
-LABEL org.opencontainers.image.url="https://ocaml-sf.org/"
-LABEL org.opencontainers.image.vendor="The OCaml Software Foundation"
+ENTRYPOINT ["dumb-init","/usr/bin/learn-ocaml-client"]
 
 
 FROM alpine:3.13 as program
@@ -66,12 +61,11 @@ EXPOSE 8443
 USER learn-ocaml
 WORKDIR /home/learn-ocaml
 
+ARG opam_switch="/home/opam/.opam/4.12"
+
 COPY --from=compilation /home/opam/install-prefix /usr
+COPY --from=compilation "$opam_switch/bin"/ocaml* "$opam_switch/bin/"
+COPY --from=compilation "$opam_switch/lib/ocaml" "$opam_switch/lib/ocaml/"
 
-ENTRYPOINT ["dumb-init","learn-ocaml","--sync-dir=/sync","--repo=/repository"]
+ENTRYPOINT ["dumb-init","/usr/bin/learn-ocaml","--sync-dir=/sync","--repo=/repository"]
 CMD ["build","serve"]
-
-LABEL org.opencontainers.image.title="learn-ocaml"
-LABEL org.opencontainers.image.description="learn-ocaml app manager"
-LABEL org.opencontainers.image.url="https://ocaml-sf.org/"
-LABEL org.opencontainers.image.vendor="The OCaml Software Foundation"

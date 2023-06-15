@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -98,7 +98,14 @@ type 'a response =
 
 type error = (Cohttp.Code.status_code * string)
 
-let caching: type resp. resp Api.request -> caching = function
+let disable_cache =
+  match Sys.getenv_opt "LEARNOCAML_SERVER_NOCACHE" with
+  | None | Some ("" | "0" | "false") -> false
+  | Some _ -> true
+
+let caching: type resp. resp Api.request -> caching = fun resp ->
+  if disable_cache then Nocache else
+  match resp with
   | Api.Version () -> Shortcache (Some ["version"; "server_id"])
   | Api.Static ("fonts"::_ | "icons"::_ | "js"::_::_::_ as p) -> Longcache p
   | Api.Static ("css"::_ | "js"::_ | _ as p) -> Shortcache (Some p)
@@ -559,13 +566,18 @@ module Request_handler = struct
             (function
              | Failure body -> (`Bad_request, body)
              | exn -> (`Internal_server_error, Printexc.to_string exn))
-      | Api.Create_teacher_token token ->
+      | Api.Create_teacher_token (token, nick) ->
          verify_teacher_token token
          >?= fun () ->
-             Token.create_teacher () >>= fun token ->
+             Token.create_teacher ()
+             >>= fun tok ->
+             (match nick with | None -> Lwt.return_unit
+                              | Some nickname ->
+                                 Save.set tok Save.{empty with nickname})
+             >>= fun () ->
              let auth = Token_index.Token (token, false) in
              Token_index.UserIndex.add !sync_dir auth >>= fun () ->
-             respond_json cache token
+             respond_json cache tok
       | Api.Create_user (email, nick, password, secret) when config.ServerData.use_passwd ->
          valid_string_of_endp conn
          >?= fun conn ->
