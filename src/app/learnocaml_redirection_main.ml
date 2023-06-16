@@ -6,8 +6,9 @@
  * included LICENSE file for details. *)
 
 open Learnocaml_common
+open Js_of_ocaml
 
-module H = Tyxml_js.Html
+module H = Js_of_ocaml_tyxml.Tyxml_js.Html
 
 let rec drop_2_trailing = function
   | [] | [_] | [_; _] -> []

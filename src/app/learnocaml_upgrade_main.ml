@@ -8,6 +8,7 @@
 open Js_utils
 open Lwt
 open Learnocaml_common
+open Js_of_ocaml
 
 module El = struct
   let id s = s, find_component s

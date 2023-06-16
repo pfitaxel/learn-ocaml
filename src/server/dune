@@ -20,5 +20,6 @@
             token_index
             learnocaml_partition_create
             cryptokit
-            markup)
+            markup
+            base64)
 )

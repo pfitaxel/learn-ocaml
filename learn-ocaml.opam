@@ -63,7 +63,9 @@ depends: [
   "re"
   "safepass"
   "ssl" {= "0.5.12"}
+  "tyxml-js"
   "uutf" {>= "1.0" }
+  "ocaml-url"
   "vg"
   "yojson" {>= "1.4.0" }
 ]

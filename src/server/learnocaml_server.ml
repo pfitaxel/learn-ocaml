@@ -199,7 +199,7 @@ let check_report exo report grade =
 let generate_csrf_token length =
   let random_bytes = Bytes.make length '\000' in
   Cryptokit.Random.secure_rng#random_bytes random_bytes 0 length;
-  B64.encode (Bytes.to_string random_bytes)
+  Base64.encode (Bytes.to_string random_bytes)
 
 let generate_hmac secret csrf user_id =
   let decoder = Cryptokit.Hexa.decode () in
