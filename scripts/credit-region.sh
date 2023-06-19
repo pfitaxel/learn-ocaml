@@ -2,6 +2,8 @@
 # Author: Erik Martin-Dorel, 2023
 # License: MIT
 
+set -o pipefail
+
 if [ $# -lt 3 ]; then
     cat <<EOF
 Usage: ./credit-region.sh File LineBeg LineEnd [BeyondOauthMoodleDev]
