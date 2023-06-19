@@ -4,9 +4,9 @@
 
 if [ $# -lt 3 ]; then
     cat <<EOF
-Usage: ./credit-region.sh File LineBeg LineEnd
+Usage: ./credit-region.sh File LineBeg LineEnd [BeyondOauthMoodleDev]
 
-  e.g. ./credit-region.sh ../src/app/learnocaml_upgrade_main.ml 1 ""
+  e.g. ./credit-region.sh ../src/app/learnocaml_upgrade_main.ml 1 "" "true"
 EOF
     exit 1
 fi
@@ -37,9 +37,14 @@ main() {
     local File="$1"
     local LineBeg="$2"
     local LineEnd="$3"
+    local BeyondOauthMoodleDev="$4"
     # todo: type verifications
-    git_blame_wrapper "$File" "$LineBeg" "$LineEnd" | tee /dev/stderr | { sleep 0.05s; echo; sed -e 's/^ *[0-9]\+ /Co-authored-by: /' | grep $( printf -- '-e %s ' $(oauth_moodle_dev_authors) ) ; }
- }
+    if [ -z "$BeyondOauthMoodleDev" ]; then
+        git_blame_wrapper "$File" "$LineBeg" "$LineEnd" | grep $( printf -- '-e %s ' $(oauth_moodle_dev_authors) ) | tee /dev/stderr | { sleep 0.05s; echo; sed -e 's/^ *[0-9]\+ /Co-authored-by: /' ; }
 
-main "$1" "$2" "$3"
-# "${4:-2847c36d34f342d919272b9e0885a900166c6aec^..}"
+    else
+        git_blame_wrapper "$File" "$LineBeg" "$LineEnd" | tee /dev/stderr | { sleep 0.05s; echo; sed -e 's/^ *[0-9]\+ /Co-authored-by: /' ; }
+    fi
+}
+
+main "$1" "$2" "$3" "$4"
