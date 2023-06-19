@@ -17,7 +17,7 @@ git_blame_wrapper() {
     local File="$1"
     local LineBeg="$2"
     local LineEnd="$3"
-    git blame -L"$LineBeg,$LineEnd" -M "$File" --line-porcelain | grep -e "^author " -e "^author-mail " | perl -wpe 's/^author(?:-mail)? //; if($.%2){s/\n/ /;}' | sort | uniq -c
+    git blame -L"$LineBeg,$LineEnd" -M -w "$File" --line-porcelain | grep -e "^author " -e "^author-mail " | perl -wpe 's/^author(?:-mail)? //; if($.%2){s/\n/ /;}' | sort | uniq -c
     # already follows the .mailmap file.
 }
 
