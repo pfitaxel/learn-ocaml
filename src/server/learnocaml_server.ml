@@ -332,7 +332,9 @@ module Request_handler = struct
          respond_json cache (Api.version, config.ServerData.server_id)
       | Api.Launch body when config.ServerData.use_moodle ->
          (* 32 bytes of entropy, same as RoR as of 2020. *)
-         let csrf_token = generate_csrf_token 32 in
+         let csrf_token =  match generate_csrf_token 32 with
+           | Ok tok -> tok
+           | Error (`Msg msg) -> failwith msg in
          let cookies = [Cohttp.Cookie.Set_cookie_hdr.make
                           ~expiration:(`Max_age (Int64.of_int 3600))
                           ~path:"/" ~http_only:true
@@ -912,7 +914,9 @@ module Request_handler = struct
          Token_index.UpgradeIndex.can_reset_password !sync_dir handle >>=
            (function
             | Some _token ->
-               let csrf_token = generate_csrf_token 32 in
+               let csrf_token =  match generate_csrf_token 32 with
+                 | Ok tok -> tok
+                 | Error (`Msg msg) -> failwith msg in
                let cookies = [Cohttp.Cookie.Set_cookie_hdr.make
                                 ~expiration:(`Max_age (Int64.of_int 3600))
                                 ~path:"/" ~http_only:true
@@ -988,7 +992,9 @@ module Request_handler = struct
          Token_index.UserIndex.emails_of_token !sync_dir token >>=
            (function
             | None ->
-               let csrf_token = generate_csrf_token 32 in
+               let csrf_token =  match generate_csrf_token 32 with
+                 | Ok tok -> tok
+                 | Error (`Msg msg) -> failwith msg in
                let cookies = [Cohttp.Cookie.Set_cookie_hdr.make
                                 ~expiration:(`Max_age (Int64.of_int 3600))
                                 ~path:"/" ~http_only:true ("csrf", csrf_token)] in
