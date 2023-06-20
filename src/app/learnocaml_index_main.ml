@@ -1040,20 +1040,21 @@ let () =
            let buttons =
              match emails with
              | Some (cur_email, Some new_email) when cur_email <> new_email ->
-                [[%i"Change password"], change_password;
-                 [%i"Abort e-mail change"], abort_email_change]
+                [[%i"Change password"], (fun () -> change_password () >>= fun _ -> Lwt.return_unit);
+                 [%i"Abort e-mail change"], (fun () -> abort_email_change () >>= fun _ -> Lwt.return_unit)]
              | Some (_email, Some _) ->
-                [[%i"Change password"], change_password]
+                [[%i"Change password"], (fun () -> change_password () >>= fun _ -> Lwt.return_unit)]
              | Some (_email, None) ->
-                [[%i"Change password"], change_password;
-                 [%i"Change e-mail"], change_email]
-             | None -> (* Upgrade is not critical as the user logged-in by LTI *)
-                show_upgrade_button ~critical:false (); [] in
+                [[%i"Change password"], (fun () -> change_password () >>= fun _ -> Lwt.return_unit);
+                 [%i"Change e-mail"], (fun () -> change_email () >>= fun _ -> Lwt.return_unit)]
+             | None ->
+                show_upgrade_button ~critical:false ();
+                [] in
            let container = El.op_buttons_container in
            Manip.removeChildren container;
            List.iter (fun (name, callback) ->
                let btn = Tyxml_js.Html5.(button [txt name]) in
-               Manip.Ev.onclick btn (fun _ -> Lwt.async callback; true);
+               Manip.Ev.onclick btn (fun _ -> Lwt.async (fun () -> callback ()); true);
                Manip.appendChild container btn) buttons;
            Lwt.return_unit
     else Lwt.return_unit
