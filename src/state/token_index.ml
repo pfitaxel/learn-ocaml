@@ -284,7 +284,9 @@ let signature_oauth list_args http_method basic_uri secret =
     let hash = Cryptokit.MAC.hmac_sha1 signing_key in
     let result = Cryptokit.hash_string hash signature_base_string in
     Base64.encode result
-  in encoding
+  in match encoding with
+     | Ok string -> string
+     | Error (`Msg msg) -> failwith msg
 
 let oauth_signature_method = "HMAC-SHA1"
 
