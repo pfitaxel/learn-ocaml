@@ -46,8 +46,6 @@ depends: [
   "ppx_tools"
   "safepass"
   "ssl" {= "0.5.12"}
-  "tyxml-js"
-  "ocaml-url"
   "vg"
 ]
 build: [
