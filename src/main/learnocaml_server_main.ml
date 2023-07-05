@@ -26,8 +26,8 @@ let signal_waiter =
   waiter
 
 let main o =
-  Printf.printf "ROOT_URL: \"%s\"\n%!" o.base_url;
   let open Server_args in
+  Printf.printf "ROOT_URL: \"%s\"\n%!" o.base_url;
   Printf.printf "Learnocaml server v.%s starting on port %d\n%!"
     Learnocaml_api.version o.port;
   if o.base_url <> "" then
