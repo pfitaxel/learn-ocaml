@@ -8,6 +8,7 @@
 
 open Lwt
 open Learnocaml_data
+open Lwt.Syntax
 
 let ( / ) dir f = if dir = "" then f else Filename.concat dir f
 let indexes_subdir = "data"
@@ -601,3 +602,51 @@ module BaseUpgradeIndex (RW: IndexRW) = struct
 end
 
 module UpgradeIndex = BaseUpgradeIndex (IndexFile)
+
+module NonceIndex = struct
+  let name = "nonce"
+  let sync_dir = "sync"
+  let filename = (sync_dir / indexes_subdir / name)
+
+  module Store = Irmin_mem.KV.Make(Irmin.Contents.Json_value)
+  module Info = Irmin_unix.Info(Store.Info)
+
+  let serialise tok =
+    let tok_str = Token.to_string tok in
+    `O ["token", `String tok_str; "auth", `String "false"]
+
+  let read keys parse path=
+    let config = Irmin_git.config ~bare:true path in
+    let* repo = Store.Repo.v config in
+    let* t = Store.main repo in
+    Lwt_list.map_p
+      (fun key ->
+        let+ x = Store.get t key in parse x)
+      keys
+
+  let write keys serialise path data_list =
+    let config = Irmin_git.config ~bare:true path in
+    let* repo = Store.Repo.v config in
+    let* t = Store.main repo in
+    Lwt_list.iter_p
+      (fun (key,data) ->
+        Store.set_exn t ~info:(Info.v "message") key
+          (*deal with the errors if using `set` instead of `set_exn`*)
+          (serialise data))
+    @@ List.combine keys data_list
+
+  let create_entry tok =
+    let nonce = Token.random_nonce () in
+    write [tok] serialise [nonce]
+
+  let delete_entry tok =
+    let config = Irmin_git.config ~bare:true path in
+    let* repo = Store.Repo.v config in
+    let* t = Store.main repo in
+    Store.with_tree_exn t [] ~info:(Info.v "message") ~strategy:`Set (fun tree ->
+        let tree = match tree with
+          | Some t -> t
+          | None -> Store.Tree.empty () in
+        let* tree = Store.Tree.remove tree tok in
+        Lwt.return_some tree)
+end
