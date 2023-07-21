@@ -283,6 +283,12 @@ module Token = struct
     let part () = String.init 3 (fun _ -> rand ()) in
     [ part () ; part () ; part () ; part () ]
 
+  let random_nonce () =
+    let length = 32 in
+    let random_bytes = Bytes.make length '\000' in
+    Cryptokit.Random.secure_rng#random_bytes random_bytes 0 length;
+    Base64.encode (Bytes.to_string random_bytes)
+
   let random_teacher () = teacher_token_prefix :: random ()
 
   let is_teacher = function
