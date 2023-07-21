@@ -10,6 +10,7 @@
  (modules Learnocaml_data)
  (libraries asak
             sha
+            cryptokit
             learnocaml_toplevel_history
             learnocaml_report
             learnocaml_repository)
@@ -30,7 +31,7 @@
  (name token_index)
  (wrapped false)
  (modules Token_index)
- (libraries base64 lwt lwt.unix lwt_utils learnocaml_api learnocaml_data cryptokit netstring safepass)
+ (libraries base64 lwt lwt.unix lwt_utils learnocaml_api learnocaml_data cryptokit netstring safepass irmin irmin-git)
 )
 
 (library

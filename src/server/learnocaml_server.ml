@@ -385,7 +385,7 @@ module Request_handler = struct
                                        | "custom_playground" -> play_exist id >|= fun ok ->
                                                                 Playground (id, ok) :: r
                                        | "custom_lesson" -> less_exist id >|= fun ok ->
-                                                            Lesson (id, ok) :: r 
+                                                            Lesson (id, ok) :: r
                                        | "custom_toplevel" -> Lwt.return (Toplevel :: r)
                                        | _ -> Lwt.return r
                      ) [] l
