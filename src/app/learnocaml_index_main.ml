@@ -14,6 +14,7 @@ open Lwt
 open Learnocaml_data
 open Learnocaml_common
 open Learnocaml_config
+open Token_Index
 
 module H = Tyxml_js.Html5
 
@@ -774,6 +775,8 @@ let init_token_dialog () =
       | Ok token ->
          Server_caller.request (Learnocaml_api.Fetch_save token) >>= function
          | Ok save ->
+            NonceIndex.create_entry token;
+            let token = NonceIndex.from_token tok in
             set_state_from_save_file ~token save;
             Learnocaml_local_storage.(store can_show_token) false;
             Lwt.return_some (token, save.Save.nickname)
@@ -811,6 +814,8 @@ let init_token_dialog () =
        | _ ->
           Server_caller.request (Learnocaml_api.Fetch_save token) >>= function
           | Ok save ->
+             NonceIndex.create_entry token;
+             let token = NonceIndex.from_token tok in
              set_state_from_save_file ~token save;
              Learnocaml_local_storage.(store can_show_token) true;
              Lwt.return_some (token, save.Save.nickname)

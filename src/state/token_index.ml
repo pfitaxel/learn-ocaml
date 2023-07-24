@@ -606,14 +606,18 @@ module UpgradeIndex = BaseUpgradeIndex (IndexFile)
 module NonceIndex = struct
   let name = "nonce"
   let sync_dir = "sync"
-  let filename = (sync_dir / indexes_subdir / name)
+  let path = (sync_dir / indexes_subdir / name)
 
   module Store = Irmin_mem.KV.Make(Irmin.Contents.Json_value)
   module Info = Irmin_unix.Info(Store.Info)
 
+  let parse json  = match json with
+  | `O [("nonce", `String token_value)] -> token_value
+  | _ -> failwith "Invalid JSON format or missing 'token' field"
+
   let serialise tok =
     let tok_str = Token.to_string tok in
-    `O ["token", `String tok_str; "auth", `String "false"]
+    `O ["nonce", `String tok_str; "auth", `String "false"]
 
   let read keys parse path=
     let config = Irmin_git.config ~bare:true path in
@@ -624,7 +628,7 @@ module NonceIndex = struct
         let+ x = Store.get t key in parse x)
       keys
 
-  let write keys serialise path data_list =
+  let write keys serialise path datas =
     let config = Irmin_git.config ~bare:true path in
     let* repo = Store.Repo.v config in
     let* t = Store.main repo in
@@ -633,11 +637,14 @@ module NonceIndex = struct
         Store.set_exn t ~info:(Info.v "message") key
           (*deal with the errors if using `set` instead of `set_exn`*)
           (serialise data))
-    @@ List.combine keys data_list
+    @@ List.combine keys datas
 
   let create_entry tok =
     let nonce = Token.random_nonce () in
-    write [tok] serialise [nonce]
+    write [tok] serialise path [nonce]
+
+  let from_token tok =
+    read [tok] parse path >|= fun nonce -> nonce
 
   let delete_entry tok =
     let config = Irmin_git.config ~bare:true path in
