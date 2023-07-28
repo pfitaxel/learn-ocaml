@@ -1197,11 +1197,12 @@ let () =
     confirm ~title:[%i"Logout"] ~ok_label:[%i"Logout"]
       dialog_content
       (fun () ->
-         Lwt.async @@ fun () ->
+        Lwt.async @@ fun () ->
+         let nonce = Learnocaml_local_storage.(retrieve sync_token) in
          Learnocaml_local_storage.clear ();
          delete_cookie "token";
          reload ();
-         Lwt.return_unit)
+         Token_index.delete_entry @@ Token_index.from_nonce nonce)
   in
   List.iter (fun (text, icon, f) ->
       button ~container:El.sync_buttons ~theme:"white" ~group:sync_button_group ~icon text f)

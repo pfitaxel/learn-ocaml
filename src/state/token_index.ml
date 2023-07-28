@@ -660,20 +660,20 @@ module NonceIndex = struct
 
   (* Returns the corresponding key for a given nonce *)
   let from_nonce v =
-  let parse json tok v = match json with
-    | `O [("nonce", `String nonce)] when nonce = v -> Some tok
-    | _ -> None
-  in
-  let config = Irmin_git.config ~bare:true path in
-  let* repo = Store.Repo.v config in
-  let* t = Store.main repo in
-  retrieve_keys t  >>= fun keys ->
-  Lwt_list.map_p
-    (fun key ->
-      let+ x = Store.get t key in
-      parse x key v
-    )
-    keys
+    let parse json tok v = match json with
+      | `O [("nonce", `String nonce)] when nonce = v -> Some tok
+      | _ -> None
+    in
+    let config = Irmin_git.config ~bare:true path in
+    let* repo = Store.Repo.v config in
+    let* t = Store.main repo in
+    retrieve_keys t  >>= fun keys ->
+    Lwt_list.map_p
+      (fun key ->
+        let+ x = Store.get t key in
+        parse x key v
+      )
+      keys
 
   let delete_entry tok =
     let config = Irmin_git.config ~bare:true path in
