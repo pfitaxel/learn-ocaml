@@ -1202,7 +1202,7 @@ let () =
          Learnocaml_local_storage.clear ();
          delete_cookie "token";
          reload ();
-         Token_index.delete_entry @@ Token_index.from_nonce nonce)
+         NonceIndex.delete_entry @@ NonceIndex.from_nonce nonce)
   in
   List.iter (fun (text, icon, f) ->
       button ~container:El.sync_buttons ~theme:"white" ~group:sync_button_group ~icon text f)
