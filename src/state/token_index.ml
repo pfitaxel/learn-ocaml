@@ -615,9 +615,8 @@ module NonceIndex = struct
   | `O [("nonce", `String token_value)] -> token_value
   | _ -> failwith "Invalid JSON format or missing 'token' field"
 
-  let serialise tok =
-    let tok_str = Token.to_string tok in
-    `O ["nonce", `String tok_str; "auth", `String "false"]
+  let serialise nonce =
+    `O ["nonce", `String nonce]
 
   let read keys parse path=
     let config = Irmin_git.config ~bare:true path in
@@ -645,6 +644,36 @@ module NonceIndex = struct
 
   let from_token tok =
     read [tok] parse path >|= fun nonce -> nonce
+
+  let retrieve_keys t =
+    let rec retrieve_keys_aux acc path =
+      Store.list t path >>= fun children ->
+      if children = [] then
+        Lwt.return (path :: acc)  (* Add the leaf key to the accumulator *)
+      else
+        Lwt_list.fold_left_s (fun acc (step, _) ->
+            let new_path = path @ [step] in
+            retrieve_keys_aux acc new_path
+          ) acc children
+    in
+    retrieve_keys_aux [] []
+
+  (* Returns the corresponding key for a given nonce *)
+  let from_nonce v =
+  let parse json tok v = match json with
+    | `O [("nonce", `String nonce)] when nonce = v -> Some tok
+    | _ -> None
+  in
+  let config = Irmin_git.config ~bare:true path in
+  let* repo = Store.Repo.v config in
+  let* t = Store.main repo in
+  retrieve_keys t  >>= fun keys ->
+  Lwt_list.map_p
+    (fun key ->
+      let+ x = Store.get t key in
+      parse x key v
+    )
+    keys
 
   let delete_entry tok =
     let config = Irmin_git.config ~bare:true path in
