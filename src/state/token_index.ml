@@ -8,6 +8,7 @@
 
 open Lwt
 open Learnocaml_data
+open Lwt.Syntax
 
 let ( / ) dir f = if dir = "" then f else Filename.concat dir f
 let indexes_subdir = "data"
@@ -283,8 +284,10 @@ let signature_oauth list_args http_method basic_uri secret =
   let encoding =
     let hash = Cryptokit.MAC.hmac_sha1 signing_key in
     let result = Cryptokit.hash_string hash signature_base_string in
-    B64.encode result
-  in encoding
+    Base64.encode result
+  in match encoding with
+     | Ok string -> string
+     | Error (`Msg msg) -> failwith msg
 
 let oauth_signature_method = "HMAC-SHA1"
 
@@ -599,3 +602,87 @@ module BaseUpgradeIndex (RW: IndexRW) = struct
 end
 
 module UpgradeIndex = BaseUpgradeIndex (IndexFile)
+
+module NonceIndex = struct
+  let name = "nonce"
+  let sync_dir = "sync"
+  let path = (sync_dir / indexes_subdir / name)
+
+  module Store = Irmin_mem.KV.Make(Irmin.Contents.Json_value)
+  module Info = Irmin_unix.Info(Store.Info)
+
+  let parse json  = match json with
+  | `O [("nonce", `String token_value)] -> token_value
+  | _ -> failwith "Invalid JSON format or missing 'token' field"
+
+  let serialise nonce =
+    `O ["nonce", `String nonce]
+
+  let read keys parse path=
+    let config = Irmin_git.config ~bare:true path in
+    let* repo = Store.Repo.v config in
+    let* t = Store.main repo in
+    Lwt_list.map_p
+      (fun key ->
+        let+ x = Store.get t key in parse x)
+      keys
+
+  let write keys serialise path datas =
+    let config = Irmin_git.config ~bare:true path in
+    let* repo = Store.Repo.v config in
+    let* t = Store.main repo in
+    Lwt_list.iter_p
+      (fun (key,data) ->
+        Store.set_exn t ~info:(Info.v "message") key
+          (*deal with the errors if using `set` instead of `set_exn`*)
+          (serialise data))
+    @@ List.combine keys datas
+
+  let create_entry tok =
+    let nonce = Token.random_nonce () in
+    write [tok] serialise path [nonce]
+
+  let from_token tok =
+    read [tok] parse path >|= fun nonce -> nonce
+
+  let retrieve_keys t =
+    let rec retrieve_keys_aux acc path =
+      Store.list t path >>= fun children ->
+      if children = [] then
+        Lwt.return (path :: acc)  (* Add the leaf key to the accumulator *)
+      else
+        Lwt_list.fold_left_s (fun acc (step, _) ->
+            let new_path = path @ [step] in
+            retrieve_keys_aux acc new_path
+          ) acc children
+    in
+    retrieve_keys_aux [] []
+
+  (* Returns the corresponding key for a given nonce *)
+  let from_nonce v =
+    let parse json tok v = match json with
+      | `O [("nonce", `String nonce)] when nonce = v -> Some tok
+      | _ -> None
+    in
+    let config = Irmin_git.config ~bare:true path in
+    let* repo = Store.Repo.v config in
+    let* t = Store.main repo in
+    retrieve_keys t  >>= fun keys ->
+    Lwt_list.map_p
+      (fun key ->
+        let+ x = Store.get t key in
+        parse x key v
+      )
+      keys
+
+  let delete_entry tok =
+    let config = Irmin_git.config ~bare:true path in
+    let* repo = Store.Repo.v config in
+    let* t = Store.main repo in
+    Store.with_tree_exn t [] ~info:(Info.v "message") ~strategy:`Set (fun tree ->
+        let tree = match tree with
+          | Some t -> t
+          | None -> Store.Tree.empty () in
+        let* tree = Store.Tree.remove tree tok in
+        Lwt.return_some tree)
+end

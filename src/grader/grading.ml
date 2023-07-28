@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -13,14 +13,14 @@ exception Invalid_grader
 let string_of_exn = function
   | Internal_error (msg, error) ->
       let msg =
-        Printf.sprintf [%if"Exercise definition error %s:\n%s\n%!"]
-          msg error.Toploop_ext.msg
+        Format.asprintf [%if"Exercise definition error %s:\n%a\n%!"]
+          msg Location.print_report (Toploop_results.to_error error)
       in
       Some  msg
   | User_code_error error ->
       let msg =
-        Printf.sprintf [%if"Error in user code:\n\n%s\n%!"]
-          error.Toploop_ext.msg
+        Format.asprintf [%if"Error in user code:\n\n%a\n%!"]
+          Location.print_report (Toploop_results.to_error error)
       in
       Some msg
   | _ -> None
@@ -28,9 +28,7 @@ let string_of_exn = function
 let () =
   Location.register_error_of_exn (fun exn ->
       match string_of_exn exn with
-      | Some msg ->
-          Some {Location.loc = Location.none ; sub = [] ;
-                msg ; if_highlight = msg }
+      | Some msg -> Some (Location.error msg)
       | None -> None)
 
 
@@ -86,7 +84,7 @@ let get_grade
           let msg =
             String.concat "\n"
               (List.map Buffer.contents [stderr_buffer; stdout_buffer; outcomes_buffer])
-          in fail { Toploop_ext.msg ; locs = [] ; if_highlight = msg }
+          in fail ((Location.none, msg), [])
         end
     | Toploop_ext.Error (err, w) ->
         warn w ;
@@ -141,6 +139,10 @@ let get_grade
       handle_error (internal_error [%i"while preparing the tests"]) @@
       Toploop_ext.use_string ~print_outcome ~ppf_answer
         "module Report = Learnocaml_report" ;
+      (* The following 3 lines are just a workaround for issue #457 *)
+      handle_error (internal_error [%i"while preparing the tests"]) @@
+      Toploop_ext.use_string ~print_outcome ~ppf_answer
+        "module Introspection = Introspection" ;
       set_progress [%i"Launching the test bench."] ;
 
       let () =

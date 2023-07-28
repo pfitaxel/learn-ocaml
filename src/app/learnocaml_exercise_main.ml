@@ -1,12 +1,14 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2022 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
 open Js_of_ocaml
+open Js_of_ocaml_tyxml
+open Js_of_ocaml_lwt
 open Js_utils
 open Lwt.Infix
 open Learnocaml_common
@@ -79,9 +81,9 @@ module Exercise_link =
         ]
         content
   end
-  
-module Display = Display_exercise(Exercise_link)    
-open Display  
+
+module Display = Display_exercise(Exercise_link)
+open Display
 
 let is_readonly = ref false
 
@@ -107,7 +109,7 @@ let () =
   let toplevel_toolbar = find_component "learnocaml-exo-toplevel-toolbar" in
   let editor_toolbar = find_component "learnocaml-exo-editor-toolbar" in
   let toplevel_button =
-    button ~container: toplevel_toolbar ~theme: "dark" ~group:toplevel_buttons_group ?state:None in
+    button ?id:None ~container: toplevel_toolbar ~theme: "dark" ~group:toplevel_buttons_group ?state:None in
   let id = match Url.Current.path with
     | "" :: "exercises" :: p | "exercises" :: p ->
         String.concat "/" (List.map Url.urldecode (List.filter ((<>) "") p))
@@ -179,8 +181,10 @@ let () =
   (* ---- editor pane --------------------------------------------------- *)
   let editor, ace = setup_editor solution in
   let module EB = Editor_button (struct let ace = ace let buttons_container = editor_toolbar end) in
-  EB.cleanup (Learnocaml_exercise.(access File.template exo));
-  EB.sync token id;
+  if has_server then
+    EB.reload token id (Learnocaml_exercise.(access File.template exo))
+  else EB.cleanup (Learnocaml_exercise.(access File.template exo));
+  EB.sync token id (fun () -> Ace.focus ace; Ace.set_synchronized ace) ;
   EB.download id;
   EB.eval top select_tab;
   let typecheck = typecheck top ace editor in
@@ -213,7 +217,7 @@ let () =
     typecheck true
   end;
   begin toolbar_button
-          ~icon: "reload" [%i"Grade!"] @@ fun () ->
+      ~icon: "reload" [%i"Grade!"] @@ fun () ->
     check_if_need_refresh has_server >>= fun () ->
     let aborted, abort_message =
       let t, u = Lwt.task () in
@@ -221,7 +225,8 @@ let () =
       Manip.Ev.onclick btn (fun _ -> Lwt.wakeup u () ; true) ;
       let div =
         Tyxml_js.Html5.(div ~a: [ a_class [ "dialog" ] ]
-                          [ txt [%i"Grading is taking a lot of time, "] ;
+                          [ txt [%i"Grading is taking a lot of time, \
+                                    maybe your code is looping? "] ;
                             btn ;
                             txt " ?" ]) in
       Manip.SetCss.opacity div (Some "0") ;
@@ -247,7 +252,7 @@ let () =
                Lwt.return_unit)
         in
         let abortion =
-          Lwt_js.sleep 5. >>= fun () ->
+          Lwt_js.sleep 15. >>= fun () ->
           Manip.SetCss.opacity abort_message (Some "1") ;
           aborted >>= fun () ->
           Lwt.return Learnocaml_report.[ Message ([ Text [%i"Grading aborted by user."] ], Failure) ] in
@@ -264,7 +269,8 @@ let () =
             Some solution, None
         in
         token >>= fun token ->
-        sync_exercise token id ?answer ?editor >>= fun _save ->
+        sync_exercise token id ?answer ?editor (fun () -> Ace.set_synchronized ace)
+        >>= fun _save ->
         select_tab "report" ;
         Lwt_js.yield () >>= fun () ->
         Ace.focus ace ;
@@ -283,7 +289,25 @@ let () =
         Ace.focus ace ;
         typecheck true
   end ;
-  Window.onunload (fun _ev -> local_save ace id; true);
+  (* Small but cross-compatible hack (tested with Firefox-ESR, Chromium, Safari)
+   * that reuses part of this commit:
+   * https://github.com/pfitaxel/learn-ocaml/commit/15780b5b7c91689a26cfeaf33f3ed2cdb3a5e801
+   * For details on this event, see:
+   * https://developer.mozilla.org/en-US/docs/Web/API/WindowEventHandlers/onbeforeunload#example
+   *
+   * Ideally, we might have wanted to use a variant of [Dom.handler]
+   * that is compatible with "unbeforeunload".
+   * For further discussion on this issue, see:
+   * https://github.com/ocaml-sf/learn-ocaml/issues/467
+   *)
+  let prompt_before_unload () : unit =
+    Js.Unsafe.js_expr "window.onbeforeunload = function(e) {e.preventDefault(); return false;}" in
+  let resume_before_unload () : unit =
+    Js.Unsafe.js_expr "window.onbeforeunload = null" in
+  let () =
+    Ace.register_sync_observer ace (fun sync ->
+        if not sync then prompt_before_unload ()
+        else resume_before_unload ()) in
   (* ---- return -------------------------------------------------------- *)
   toplevel_launch >>= fun _ ->
   typecheck false >>= fun () ->

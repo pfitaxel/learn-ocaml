@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -283,6 +283,12 @@ module Token = struct
     let part () = String.init 3 (fun _ -> rand ()) in
     [ part () ; part () ; part () ; part () ]
 
+  let random_nonce () =
+    let length = 32 in
+    let random_bytes = Bytes.make length '\000' in
+    Cryptokit.Random.secure_rng#random_bytes random_bytes 0 length;
+    Base64.encode (Bytes.to_string random_bytes)
+
   let random_teacher () = teacher_token_prefix :: random ()
 
   let is_teacher = function
@@ -293,7 +299,7 @@ module Token = struct
 
   module T = struct
     type nonrec t = t
-    let compare = Pervasives.compare
+    let compare = compare
   end
 
   module Set = Set.Make(T)

@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -77,12 +77,12 @@ let urlpath p =
 
 let request req =
   let do_req = function
-    | { Learnocaml_api.meth = `GET; path; args; _ } ->
-        Lwt_request.get ?headers:None ~url:(urlpath path) ~args:args
-    | { Learnocaml_api.meth = `POST body; path; args; _ } ->
+    | { Learnocaml_api.meth = `GET; path; args } ->
+        Lwt_request.get ?headers:None ~url:(urlpath path) ~args:args ()
+    | { Learnocaml_api.meth = `POST body; path; args } ->
         let get_args = match args with [] -> None | a -> Some a in
         Lwt_request.post ?headers:None ?get_args
-          ~url:(urlpath path) ~body:(Some body)
+          ~url:(urlpath path) ~body:(Some body) ()
   in
   Lwt.catch (fun () ->
       Api_client.make_request (fun http_request ->

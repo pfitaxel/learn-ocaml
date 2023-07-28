@@ -1,13 +1,17 @@
-# Note: this file is dev-specific.
+# NOTE: This file is dev-specific.
+#
 # To deploy learn-ocaml, see e.g.:
 # https://github.com/pfitaxel/docker-learn-ocaml/blob/master/docker-compose.yml
 
-# Note: regarding the very first run (sudo docker-compose up --build),
-# the setup of the moodle container ("Running Moodle install script")
-# may take a long time (up to 18').
-# Do NOT stop the docker-compose app too early, otherwise the database
-# would be in a broken state, leading to a systematic error at further
-# runs ("learn-ocaml_moodle_1 exited with code 1").
+# NOTE: Regarding the very first run (sudo docker-compose up --build),
+# the setup of the moodle container ("INFO  ==> Running Moodle install script")
+# may take a long time (up to 18 minutes).
+# Once this is done ("INFO  ==> ** Moodle setup finished! **"),
+# you can browse http://localhost:9090/
+#
+# DO NOT STOP the docker-compose app too early during the first run, otherwise,
+# the database would be in a broken state, leading to a systematic error at
+# further runs ("learn-ocaml-moodle-1 exited with code 1").
 
 version: '3.7'
 
@@ -42,7 +46,9 @@ services:
   maildev:
     image: maildev/maildev
     ports:
-      - "1080:80"
+      - "1080:1080"
+    environment:
+      MAILDEV_SMTP_PORT: 25
     networks:
       - learnocaml-net
 
@@ -92,8 +98,8 @@ volumes:
     driver: local
 
 # END https://github.com/bitnami/bitnami-docker-moodle/blob/ffa8007ebb0ebc501eeeba62804d10b0efef3673/docker-compose.yml
-# @ https://github.com/bitnami/bitnami-docker-moodle#readme
-# @ https://github.com/bitnami/bitnami-docker-moodle#configuration
+
+# See https://github.com/bitnami/containers/blob/main/bitnami/moodle/README.md#configuration
 
 networks:
   learnocaml-net:

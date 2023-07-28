@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -43,7 +43,7 @@ let get_grade ?callback ?timeout ?dirname exo solution =
     ResDump.output { OCamlResFormats.base_output_dir = cmis_dir } in
   dump_cmis Embedded_cmis.root ;
   dump_cmis Embedded_grading_cmis.root ;
-  Config.load_path := [ cmis_dir ] ;
+  Load_path.init [ cmis_dir ] ;
   Toploop_unix.initialize () ;
   let divert name chan cb =
     let redirection = Toploop_unix.redirect_channel name chan cb in

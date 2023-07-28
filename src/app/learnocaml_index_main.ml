@@ -1,17 +1,20 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2022 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
 open Js_of_ocaml
+open Js_of_ocaml_tyxml
+open Js_of_ocaml_lwt
 open Js_utils
 open Lwt
 open Learnocaml_data
 open Learnocaml_common
 open Learnocaml_config
+open Token_Index
 
 module H = Tyxml_js.Html5
 
@@ -72,7 +75,7 @@ module El = struct
   module Dyn = struct
     (** Elements that are dynamically created (ids only) *)
     let exercise_list_id = "learnocaml-main-exercise-list"
-    let tryocaml_id = "learnocaml-main-tryocaml"
+    let tutorial_id = "learnocaml-main-tutorial"
     let lesson_id = "learnocaml-main-lesson"
     let toplevel_id = "learnocaml-main-toplevel"
   end
@@ -317,7 +320,7 @@ let lessons_tab select (arg, set_arg, _delete_arg) () =
   end >>= fun () ->
   Lwt.return lesson_div
 
-let tryocaml_tab select (arg, set_arg, _delete_arg) () =
+let tutorial_tab select (arg, set_arg, _delete_arg) () =
   let open Tutorial in
   let navigation_div =
     Tyxml_js.Html5.(div ~a: [ a_class [ "navigation" ] ] []) in
@@ -336,7 +339,7 @@ let tryocaml_tab select (arg, set_arg, _delete_arg) () =
   let buttons_div =
     Tyxml_js.Html5.(div ~a: [ a_class [ "buttons" ] ] []) in
   let tutorial_div =
-    Tyxml_js.Html5.(div ~a: [ a_id El.Dyn.tryocaml_id ])
+    Tyxml_js.Html5.(div ~a: [ a_id El.Dyn.tutorial_id ])
       [ navigation_div ; step_div ; toplevel_div ; buttons_div ] in
   let toplevel_buttons_group = button_group () in
   disable_button_group toplevel_buttons_group (* enabled after init *) ;
@@ -345,7 +348,7 @@ let tryocaml_tab select (arg, set_arg, _delete_arg) () =
     let on_enable () = Manip.removeClass step_div "disabled" in
     toplevel_launch ~on_disable ~on_enable toplevel_div
       Learnocaml_local_storage.toplevel_history
-      (fun () -> Lwt.async select) toplevel_buttons_group "tryocaml"
+      (fun () -> Lwt.async select) toplevel_buttons_group "tutorials"
   in
   show_loading [%i"Loading tutorials"] @@ fun () ->
   Lwt_js.sleep 0.5 >>= fun () ->
@@ -501,7 +504,7 @@ let tryocaml_tab select (arg, set_arg, _delete_arg) () =
   load_tutorial !current_tutorial_name !current_step_id () >>= fun () ->
   toplevel_launch >>= fun top ->
   let toplevel_button =
-    button ~container: buttons_div ~theme: "dark" ~group:toplevel_buttons_group ?state:None in
+    button ?id:None ~container: buttons_div ~theme: "dark" ~group:toplevel_buttons_group ?state:None in
   init_toplevel_pane toplevel_launch top toplevel_buttons_group toplevel_button ;
   Lwt.return tutorial_div
 
@@ -521,7 +524,7 @@ let toplevel_tab select _ () =
     (fun _ -> Lwt.async select) toplevel_buttons_group "toplevel"
   >>= fun top ->
   Manip.appendChild El.content div ;
-  let button = button ~container: buttons_div ~theme: "dark" ?group:None ?state:None in
+  let button = button ?id:None ~container: buttons_div ~theme: "dark" ?group:None ?state:None in
   init_toplevel_pane (Lwt.return top) top toplevel_buttons_group button ;
   Lwt.return div
 
@@ -686,11 +689,13 @@ let init_token_dialog () =
          retrieve
            (Learnocaml_api.Create_token (secret, None, Some nickname))
          >>= fun token ->
-         Learnocaml_local_storage.(store sync_token) token;
+         NonceIndex.create_entry token;
+         let nonce = NonceIndex.from_token token in
+         Learnocaml_local_storage.(store sync_token) nonce;
          Learnocaml_local_storage.(store can_show_token) true;
-         show_token_dialog token
+         show_token_dialog nonce
          >>= fun () ->
-         Lwt.return_some (token, nickname))
+         Lwt.return_some (nonce, nickname))
     else
       Lwt.return_none
   in
@@ -772,9 +777,11 @@ let init_token_dialog () =
       | Ok token ->
          Server_caller.request (Learnocaml_api.Fetch_save token) >>= function
          | Ok save ->
-            set_state_from_save_file ~token save;
+            NonceIndex.create_entry token;
+            let nonce = NonceIndex.from_token token in
+            set_state_from_save_file ~token:nonce save;
             Learnocaml_local_storage.(store can_show_token) false;
-            Lwt.return_some (token, save.Save.nickname)
+            Lwt.return_some (nonce, save.Save.nickname)
          | Error (`Not_found _) ->
             alert ~title:[%i"TOKEN NOT FOUND"]
               [%i"The entered token couldn't be recognized."];
@@ -809,9 +816,11 @@ let init_token_dialog () =
        | _ ->
           Server_caller.request (Learnocaml_api.Fetch_save token) >>= function
           | Ok save ->
-             set_state_from_save_file ~token save;
+             NonceIndex.create_entry token;
+             let nonce = NonceIndex.from_token token in
+             set_state_from_save_file ~token:nonce save;
              Learnocaml_local_storage.(store can_show_token) true;
-             Lwt.return_some (token, save.Save.nickname)
+             Lwt.return_some (nonce, save.Save.nickname)
           | Error (`Not_found _) ->
              alert ~title:[%i"TOKEN NOT FOUND"]
                [%i"The entered token couldn't be recognized."];
@@ -962,7 +971,9 @@ let set_string_translations () =
   List.iter
     (fun (el, text) ->
        (Tyxml_js.To_dom.of_input el)##.placeholder := Js.string text)
-    placeholder_translations
+    placeholder_translations;
+  Manip.SetHTMLElement.title (find_component "learnocaml-main-feedback")
+    [%i"Send feedback to Learn-OCaml developers"]
 
 let () =
   Lwt.async_exception_hook := begin fun e ->
@@ -1036,28 +1047,29 @@ let () =
            let buttons =
              match emails with
              | Some (cur_email, Some new_email) when cur_email <> new_email ->
-                [[%i"Change password"], change_password;
-                 [%i"Abort e-mail change"], abort_email_change]
+                [[%i"Change password"], (fun () -> change_password () >>= fun _ -> Lwt.return_unit);
+                 [%i"Abort e-mail change"], (fun () -> abort_email_change () >>= fun _ -> Lwt.return_unit)]
              | Some (_email, Some _) ->
-                [[%i"Change password"], change_password]
+                [[%i"Change password"], (fun () -> change_password () >>= fun _ -> Lwt.return_unit)]
              | Some (_email, None) ->
-                [[%i"Change password"], change_password;
-                 [%i"Change e-mail"], change_email]
-             | None -> (* Upgrade is not critical as the user logged-in by LTI *)
-                show_upgrade_button ~critical:false (); [] in
+                [[%i"Change password"], (fun () -> change_password () >>= fun _ -> Lwt.return_unit);
+                 [%i"Change e-mail"], (fun () -> change_email () >>= fun _ -> Lwt.return_unit)]
+             | None ->
+                show_upgrade_button ~critical:false ();
+                [] in
            let container = El.op_buttons_container in
            Manip.removeChildren container;
            List.iter (fun (name, callback) ->
                let btn = Tyxml_js.Html5.(button [txt name]) in
-               Manip.Ev.onclick btn (fun _ -> Lwt.async callback; true);
+               Manip.Ev.onclick btn (fun _ -> Lwt.async (fun () -> callback ()); true);
                Manip.appendChild container btn) buttons;
            Lwt.return_unit
     else Lwt.return_unit
   in
   let init_tabs token =
     let tabs =
-      (if get_opt config##.enableTryocaml
-       then [ "tryocaml", ([%i"Try OCaml"], tryocaml_tab) ] else []) @
+      (if get_opt config##.enableTutorials
+       then [ "tutorials", ([%i"Tutorials"], tutorial_tab) ] else []) @
       (if get_opt config##.enableLessons
        then [ "lessons", ([%i"Lessons"], lessons_tab) ] else []) @
         (if get_opt config##.enableExercises then
@@ -1187,11 +1199,12 @@ let () =
     confirm ~title:[%i"Logout"] ~ok_label:[%i"Logout"]
       dialog_content
       (fun () ->
-         Lwt.async @@ fun () ->
+        Lwt.async @@ fun () ->
+         let nonce = Learnocaml_local_storage.(retrieve sync_token) in
          Learnocaml_local_storage.clear ();
          delete_cookie "token";
          reload ();
-         Lwt.return_unit)
+         NonceIndex.delete_entry @@ NonceIndex.from_nonce nonce)
   in
   List.iter (fun (text, icon, f) ->
       button ~container:El.sync_buttons ~theme:"white" ~group:sync_button_group ~icon text f)
@@ -1202,7 +1215,7 @@ let () =
           show_token_dialog (get_stored_token ()));
       [%i"Sync workspace"], "sync", (fun () ->
           catch_with_alert @@ fun () ->
-          sync () >>= fun _ -> Lwt.return_unit);
+          sync () ignore >>= fun _ -> Lwt.return_unit);
       [%i"Export to file"], "download", download_save;
       [%i"Import"], "upload", import_save;
       [%i"Download all source files"], "download", download_all;
