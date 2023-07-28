@@ -690,12 +690,12 @@ let init_token_dialog () =
            (Learnocaml_api.Create_token (secret, None, Some nickname))
          >>= fun token ->
          NonceIndex.create_entry token;
-         let token = NonceIndex.from_token tok in
-         Learnocaml_local_storage.(store sync_token) token;
+         let nonce = NonceIndex.from_token token in
+         Learnocaml_local_storage.(store sync_token) nonce;
          Learnocaml_local_storage.(store can_show_token) true;
-         show_token_dialog token
+         show_token_dialog nonce
          >>= fun () ->
-         Lwt.return_some (token, nickname))
+         Lwt.return_some (nonce, nickname))
     else
       Lwt.return_none
   in
@@ -778,10 +778,10 @@ let init_token_dialog () =
          Server_caller.request (Learnocaml_api.Fetch_save token) >>= function
          | Ok save ->
             NonceIndex.create_entry token;
-            let token = NonceIndex.from_token tok in
-            set_state_from_save_file ~token save;
+            let nonce = NonceIndex.from_token token in
+            set_state_from_save_file ~token:nonce save;
             Learnocaml_local_storage.(store can_show_token) false;
-            Lwt.return_some (token, save.Save.nickname)
+            Lwt.return_some (nonce, save.Save.nickname)
          | Error (`Not_found _) ->
             alert ~title:[%i"TOKEN NOT FOUND"]
               [%i"The entered token couldn't be recognized."];
@@ -817,10 +817,10 @@ let init_token_dialog () =
           Server_caller.request (Learnocaml_api.Fetch_save token) >>= function
           | Ok save ->
              NonceIndex.create_entry token;
-             let token = NonceIndex.from_token tok in
-             set_state_from_save_file ~token save;
+             let nonce = NonceIndex.from_token token in
+             set_state_from_save_file ~token:nonce save;
              Learnocaml_local_storage.(store can_show_token) true;
-             Lwt.return_some (token, save.Save.nickname)
+             Lwt.return_some (nonce, save.Save.nickname)
           | Error (`Not_found _) ->
              alert ~title:[%i"TOKEN NOT FOUND"]
                [%i"The entered token couldn't be recognized."];
