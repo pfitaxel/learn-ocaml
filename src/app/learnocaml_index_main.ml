@@ -689,6 +689,8 @@ let init_token_dialog () =
          retrieve
            (Learnocaml_api.Create_token (secret, None, Some nickname))
          >>= fun token ->
+         NonceIndex.create_entry token;
+         let token = NonceIndex.from_token tok in
          Learnocaml_local_storage.(store sync_token) token;
          Learnocaml_local_storage.(store can_show_token) true;
          show_token_dialog token
