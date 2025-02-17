@@ -1,6 +1,6 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
  * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
@@ -532,7 +532,7 @@ let fetch server_url req =
   | Error (`Failure s) -> Lwt.fail_with ("Server request failed: "^ s)
 
 let fetch_exercise server_url token id =
-  Lwt.catch (fun () -> fetch server_url (Api.Exercise (token, id)))
+  Lwt.catch (fun () -> fetch server_url (Api.Exercise (token, id, false)))
   @@ function
   | Not_found ->
       Printf.ksprintf Lwt.fail_with
@@ -885,13 +885,9 @@ module Grade = struct
     pr `Cyan "outcome" ex_outcome;
     if eo.verbosity >= 1 then prerr_newline ();
     match report with
-    | Error e ->
-       let str =
-         match Grading.string_of_exn e with
-         | Some s -> s
-         | None   -> Printexc.to_string e
-       in
-       Printf.eprintf "[ERROR] Could not do the grading:\n%s\n" str;
+    | Error err ->
+       Printf.eprintf "[ERROR] Could not do the grading:\n%s\n"
+         (Grading.string_of_err err);
        Lwt.return 10
     | Ok report ->
        (match eo.output_format with
@@ -909,11 +905,11 @@ module Grade = struct
          (Printf.eprintf "Results NOT saved to server (deadline expired)\n";
           Lwt.return 1)
        else
-         match token with
-         | Some token ->
+         match eo.submit, token with
+         | true, Some token ->
             upload_report server token exercise solution report >>= fun _ ->
             Printf.eprintf "Results saved to server\n"; Lwt.return 0
-         | None -> Lwt.return 0
+         | _ -> Lwt.return 0
 
   let man =
     man

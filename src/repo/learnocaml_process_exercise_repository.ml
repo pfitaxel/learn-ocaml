@@ -1,6 +1,6 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
  * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
@@ -25,7 +25,7 @@ let read_exercise exercise_dir =
   in
   Learnocaml_exercise.read_lwt ~read_field
     ~id:(Filename.basename exercise_dir)
-    ~decipher:false ()
+    ()
 
 let exercises_dir = ref "./exercises"
 
@@ -47,6 +47,22 @@ let dump_dot exs =
 
 let n_processes = ref 1
 
+let grading_status, grading_status_add, grading_status_remove =
+  let in_progress = ref [] in
+  let tty = Unix.isatty Unix.stderr in
+  let show () =
+    match !in_progress with
+    | [] -> flush stderr
+    | prog ->
+        Printf.eprintf "Grading in progress: %s" (String.concat " " prog);
+        if tty then (flush stderr; prerr_string "\r\027[K") else prerr_newline ()
+  in
+  show,
+  (fun id -> in_progress := !in_progress @ [id]; show ()),
+  (fun id ->
+     in_progress := List.filter (fun x -> not (String.equal x id)) !in_progress;
+     show ())
+
 let print_grader_error exercise = function
   | Ok () -> ()
   | Error (-1) -> ()
@@ -59,38 +75,35 @@ let print_grader_error exercise = function
 
 let spawn_grader
     dump_outputs dump_reports
-    ?print_result ?dirname meta exercise output_json =
+    ?print_result ?dirname id meta ex_dir output_json =
   let rec sleep () =
     if !n_processes <= 0 then
-      Lwt_main.yield () >>= sleep
+      Lwt.pause () >>= sleep
     else (
       decr n_processes; Lwt.return_unit
     )
   in
   sleep () >>= fun () ->
-  Lwt_io.flush_all () >>= fun () ->
-  match Lwt_unix.fork () with
-  | 0 ->
-      Grader_cli.dump_outputs := dump_outputs;
-      Grader_cli.dump_reports := dump_reports;
-      Grader_cli.display_callback := false;
-      Lwt_main.run
-        (Lwt.catch (fun () ->
-             Grader_cli.grade ?print_result ?dirname meta exercise output_json
-             >|= fun r ->
-             print_grader_error exercise r;
-             match r with
-             | Ok () -> exit 0
-             | Error _ -> exit 1)
-            (fun e ->
-               Printf.eprintf "%!Grader error: %s\n%!" (Printexc.to_string e);
-               exit 10))
-  | pid ->
-      Lwt_unix.waitpid [] pid >>= fun (_pid, ret) ->
+  Lwt.catch (fun () ->
+      read_exercise ex_dir >>= fun exercise ->
+      grading_status_add id;
+      Grader_cli.grade
+        ~dump_outputs ~dump_reports ~display_callback:false
+        ?print_result ?dirname meta exercise output_json
+      >|= fun r ->
+      grading_status_remove id;
+      print_grader_error exercise r;
       incr n_processes;
-      match ret with
-      | Unix.WEXITED 0 -> Lwt.return (Ok ())
-      | _ -> Lwt.return (Error (-1))
+      r)
+    (fun e ->
+       incr n_processes;
+       grading_status_remove id;
+       Printf.eprintf "Grader error: %s\n%!" (Printexc.to_string e);
+       Lwt.return (Error 0))
+
+let exe_mtime =
+  try Unix.((stat (Sys.executable_name)).st_mtime)
+  with Unix.Unix_error _ -> max_float
 
 let main dest_dir =
   let exercises_index =
@@ -173,10 +186,9 @@ let main dest_dir =
                   else
                     from_file Meta.enc
                       (!exercises_dir / id / "meta.json")
-                    >>= fun meta ->
-                    read_exercise (!exercises_dir / id)
-                    >|= fun exercise ->
-                    SMap.add id exercise all_exercises,
+                    >|= fun meta ->
+                    let exercise_dir = !exercises_dir / id in
+                    SMap.add id exercise_dir all_exercises,
                     (id, Some meta) :: acc)
                (all_exercises, []) (List.rev ids)
              >>= fun (all_exercises, exercises) ->
@@ -195,11 +207,11 @@ let main dest_dir =
 
        let processes_arguments =
          List.rev @@ SMap.fold
-           (fun id exercise acc ->
-              let exercise_dir = !exercises_dir / id in
+           (fun id exercise_dir acc ->
               let json_path = dest_dir / Learnocaml_index.exercise_path id in
               let changed = try
                   let { Unix.st_mtime = json_time ; _ } = Unix.stat json_path in
+                  exe_mtime >= json_time ||
                   Sys.readdir exercise_dir |>
                   Array.to_list |>
                   List.map (fun f -> (Unix.stat (exercise_dir / f)).Unix.st_mtime ) |>
@@ -213,7 +225,7 @@ let main dest_dir =
                 match !dump_reports with
                 | None -> None
                 | Some dir -> Some (dir / id) in
-              (id, exercise_dir, exercise, json_path,
+              (id, exercise_dir, json_path,
                changed, dump_outputs, dump_reports) :: acc)
            all_exercises [] in
        begin
@@ -221,16 +233,18 @@ let main dest_dir =
            if !n_processes = 1 then
              Lwt_list.map_s,
              fun dump_outputs dump_reports ?print_result ?dirname
-               meta exercise json_path ->
-               Grader_cli.dump_outputs := dump_outputs;
-               Grader_cli.dump_reports := dump_reports;
-               Grader_cli.grade ?print_result ?dirname meta exercise json_path
+               _id meta ex_dir json_path ->
+               read_exercise ex_dir >>= fun exercise ->
+               Grader_cli.grade
+                 ~dump_outputs ~dump_reports ~display_callback:true
+                 ?print_result ?dirname
+                 meta exercise json_path
                >|= fun r -> print_grader_error exercise r; r
            else
              Lwt_list.map_p,
              spawn_grader
          in
-         listmap (fun (id, ex_dir, exercise, json_path, changed, dump_outputs,dump_reports) ->
+         listmap (fun (id, ex_dir, json_path, changed, dump_outputs,dump_reports) ->
              let dst_ex_dir = String.concat Filename.dir_sep [dest_dir; "static"; id] in
              Lwt_utils.mkdir_p dst_ex_dir >>= fun () ->
                Lwt_stream.iter_p (fun base ->
@@ -241,24 +255,31 @@ let main dest_dir =
                  else Lwt.return_unit)
                  (Lwt_unix.files_of_directory ex_dir) >>= fun () ->
                if not changed then begin
-                 Format.printf "%-24s (no changes)@." id ;
-                 Lwt.return true
+                 Format.eprintf "%-24s (no changes)@." id ;
+                 Lwt.return_true
                end else begin
+                 Learnocaml_precompile_exercise.precompile ~exercise_dir:ex_dir
+                 >>= fun () ->
                  grade dump_outputs dump_reports
-                   ~dirname:(!exercises_dir / id) (Index.find index id) exercise (Some json_path)
+                   ~dirname:ex_dir id (Index.find index id) ex_dir (Some json_path)
                  >>= function
                  | Ok () ->
-                     Format.printf "%-24s     [OK]@." id ;
+                     Format.eprintf "%-24s     [OK]@." id ;
                      Lwt.return true
                  | Error _ ->
-                     Format.printf "%-24s   [FAILED]@." id ;
+                     Format.eprintf "%-24s   [FAILED]@." id ;
                      Lwt.return false
-               end)
+               end
+                 >|= fun r -> grading_status (); r)
              processes_arguments
        end >>= fun results ->
        Lwt.return (List.for_all ((=) true) results))
     (fun exn ->
        let print_unknown ppf = function
+         | Unix.Unix_error (Unix.EMFILE, _, _) ->
+             Format.fprintf ppf
+               "Too many open files. Try reducing the number of concurrent jobs \
+                (with the `-j` flag) or use `ulimit -n` with a higher value"
          | Failure msg -> Format.fprintf ppf "Cannot process exercises: %s" msg
          | exn -> Format.fprintf ppf "Cannot process exercises: %s"  (Printexc.to_string exn) in
        Json_encoding.print_error ~print_unknown Format.err_formatter exn ;

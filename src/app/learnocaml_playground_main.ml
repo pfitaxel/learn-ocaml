@@ -1,20 +1,17 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
  * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
 open Js_of_ocaml
-open Js_of_ocaml_tyxml
 open Js_utils
 open Lwt.Infix
 open Learnocaml_common
 open Learnocaml_data
 open Learnocaml_config
-
-module H = Tyxml_js.Html
 
 let init_tabs, select_tab =
   mk_tab_handlers "toplevel" ["editor"]

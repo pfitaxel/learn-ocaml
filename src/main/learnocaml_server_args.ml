@@ -1,6 +1,6 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
  * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
@@ -19,9 +19,11 @@ module type S = sig
     base_url: string;
     port: int;
     cert: string option;
+    replace: bool;
+    child_pid: int option;
   }
 
-  val term: string Cmdliner.Term.t -> string Cmdliner.Term.t -> t Cmdliner.Term.t
+  val term: string Cmdliner.Term.t -> string Cmdliner.Term.t -> int option Cmdliner.Term.t -> t Cmdliner.Term.t
 end
 
 module Args (SN : Section_name) = struct
@@ -51,15 +53,26 @@ module Args (SN : Section_name) = struct
           HTTPS is enabled."
           default_http_port default_https_port)
 
+  let replace =
+    value & flag &
+    info ["replace"] ~env:(Cmd.Env.info "LEARNOCAML_REPLACE") ~doc:
+      "Replace a previously running instance of the server on the same port. \
+       Use this to reduce server downtime when updating the content \
+       of an instance: the running server will only be stopped once the \
+       new one is ready. If running in a Docker context, you may want to \
+       have a look at the flag $(b,--serve-during-build) instead."
+
   type t = {
     sync_dir: string;
     base_url: string;
     port: int;
     cert: string option;
+    replace: bool;
+    child_pid: int option;
   }
 
-  let term app_dir base_url =
-    let apply app_dir sync_dir base_url port cert =
+  let term app_dir base_url child_pid =
+    let apply app_dir sync_dir base_url port cert replace child_pid =
       Learnocaml_store.static_dir := app_dir;
       Learnocaml_store.sync_dir := sync_dir;
       let port = match port, cert with
@@ -73,10 +86,10 @@ module Args (SN : Section_name) = struct
         | None -> None);
       Learnocaml_server.port := port;
       Learnocaml_server.base_url := base_url;
-      { sync_dir; base_url; port; cert }
+      { sync_dir; base_url; port; cert; replace; child_pid }
     in
   (* warning: if you add any options here, remember to pass them through when
      calling the native server from learn-ocaml main *)
-    Term.(const apply $ app_dir $ sync_dir $ base_url $ port $ cert)
+    Term.(const apply $ app_dir $ sync_dir $ base_url $ port $ cert $ replace $ child_pid)
 
 end

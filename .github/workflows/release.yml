@@ -32,8 +32,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           release-type: ocaml
           package-name: learn-ocaml
-          bump-minor-pre-major: true
-          changelog-types: '[{"type":"feat","section":"Features","hidden":false},{"type":"fix","section":"Bug Fixes","hidden":false},{"type":"revert","section":"Reverts","hidden":false},{"type":"perf","section":"Performance Improvements","hidden":false},{"type":"refactor","section":"Code Refactoring","hidden":false},{"type":"deps","section":"Dependencies","hidden":false},{"type":"build","section":"Build System","hidden":false},{"type":"test","section":"Tests","hidden":false},{"type":"ci","section":"CI/CD","hidden":false},{"type":"docs","section":"Documentation","hidden":false},{"type":"style","section":"Style","hidden":true},{"type":"chore","section":"Miscellaneous Chores","hidden":true}]'
+          bump-minor-pre-major: false
+          changelog-types: '[{"type":"feat","section":"Features","hidden":false},{"type":"fix","section":"Bug Fixes","hidden":false},{"type":"revert","section":"Reverts","hidden":false},{"type":"perf","section":"Performance Improvements","hidden":false},{"type":"refactor","section":"Code Refactoring","hidden":false},{"type":"deps","section":"Dependencies","hidden":false},{"type":"build","section":"Build System","hidden":false},{"type":"test","section":"Tests","hidden":false},{"type":"ci","section":"CI/CD","hidden":false},{"type":"docs","section":"Documentation","hidden":false},{"type":"style","section":"Style","hidden":false},{"type":"chore","section":"Miscellaneous Chores","hidden":true}]'
 
   add-binaries:
     needs: [release-please]
@@ -42,11 +42,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
-        # Mandatory step (otherwise, hub raises "fatal: Not a git repository")
-        uses: actions/checkout@v3
+        # Mandatory step (otherwise, gh could raise "fatal: Not a git repository")
+        uses: actions/checkout@v4
       - name: Download workflow artifacts
         # cf. https://github.com/actions/download-artifact/issues/3
-        uses: dawidd6/action-download-artifact@v2
+        uses: dawidd6/action-download-artifact@v6
         with:
           workflow: static-builds.yml
           workflow_conclusion: success
@@ -71,56 +71,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run:
-          hub release edit $(find artifacts/target -type f -printf "-a %p ") -m "" "${{ needs.release-please.outputs.tag_name }}"
+          gh release -R ocaml-sf/learn-ocaml upload "${{ needs.release-please.outputs.tag_name }}" $(find artifacts/target -type f -printf "%p ")
 
-  opam-release:
+  call-opam-publish:
     needs: [release-please]
     if: ${{ needs.release-please.outputs.release_created }}
-    name: Publish to opam registry
-    env:
-      # Can be changed for debugging
-      source_repo: "ocaml-sf/learn-ocaml"
-      opam_repo: "ocaml/opam-repository"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v3
-      - name: Setup bot user
-        run: |
-          git config --global user.email "37002148+proofbot@users.noreply.github.com"
-          git config --global user.name "Learn-OCaml Bot"
-      # Some hacks to make sure opam doesn't pull the repo in a way we can't deal with
-      - name: Setup opam repository
-        run: |
-          mkdir -v -p ~/.opam/plugins/opam-publish/repos/
-          git clone https://github.com/$opam_repo ~/.opam/plugins/opam-publish/repos/${opam_repo/\//%}
-          cd ~/.opam/plugins/opam-publish/repos/${opam_repo/\//%}
-          git remote add user https://${{ secrets.OPAM_RELEASE }}@github.com/proofbot/opam-repository
-      # Set up our token because opam doesn't support env var tokens
-      - name: Setup token
-        run: |
-          mkdir -p  ~/.opam/plugins/opam-publish/
-          echo -n ${{ secrets.OPAM_RELEASE }} > ~/.opam/plugins/opam-publish/proofbot.token
-      - name: Generate CHANGES file
-        env:
-          CHANGES: ${{ needs.release-please.outputs.body }}
-        run: |
-          printf "%s" "$CHANGES" > CHANGES.md
-      # TODO: Docker-based caching
-      - name: Setup OCaml
-        uses: avsm/setup-ocaml@v1
-        with:
-          ocaml-version: 4.12.0
-      - name: Install opam-publish
-        run: |
-          opam install -y -j 2 opam-publish
-      - name: Install expect
-        run: |
-          sudo apt-get update -y -q
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends expect
-      - name: Publish to opam
-        run: |
-          ./scripts/opam-publish.exp "${{ needs.release-please.outputs.tag_name }}" "$opam_repo" "$source_repo"
+    uses: ./.github/workflows/opam-publish.yml
+    with:
+      release: "true"
+      tag_name: ${{ needs.release-please.outputs.tag_name }}
+      body: |
+        Cc @erikmd @yurug @AltGr FYI
+        
+        ${{ needs.release-please.outputs.body }}
+    secrets:
+      OPAM_RELEASE: ${{ secrets.OPAM_RELEASE }}
 
   # Note: you may want to update the jobs below and deploy-master.yml at once
   push_server:
@@ -133,7 +98,7 @@ jobs:
         run: tag="${{ needs.release-please.outputs.tag_name }}"; echo "::set-output name=tag::${tag#v}"
         id: tag
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Docker Buildx
         # cf. https://github.com/docker/buildx/blob/master/docs/reference/buildx_build.md#image
         # and https://docs.docker.com/engine/reference/commandline/buildx_create/#driver
@@ -178,7 +143,7 @@ jobs:
         run: tag="${{ needs.release-please.outputs.tag_name }}"; echo "::set-output name=tag::${tag#v}"
         id: tag
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Docker Buildx
         # cf. https://github.com/docker/buildx/blob/master/docs/reference/buildx_build.md#image
         # and https://docs.docker.com/engine/reference/commandline/buildx_create/#driver
@@ -227,7 +192,7 @@ jobs:
         run: tag="${{ needs.release-please.outputs.tag_name }}"; echo "::set-output name=tag::${tag#v}"
         id: tag
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Docker Buildx
         # cf. https://github.com/docker/buildx/blob/master/docs/reference/buildx_build.md#image
         # and https://docs.docker.com/engine/reference/commandline/buildx_create/#driver

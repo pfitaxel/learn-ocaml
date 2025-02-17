@@ -1,6 +1,6 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
  * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
@@ -151,7 +151,7 @@ let token_type =
   | TILDE
   | UNDERSCORE -> "operator"
 
-  | LINE_DIRECTIVE _ -> "meta"
+  | LINE_DIRECTIVE -> "meta"
 
   | FALSE
   | TRUE

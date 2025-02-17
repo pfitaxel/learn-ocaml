@@ -1,6 +1,6 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
  * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
@@ -783,17 +783,18 @@ module Request_handler = struct
       | Api.Exercise_index None ->
          lwt_fail (`Forbidden, "Forbidden")
 
-      | Api.Exercise (Some token, id) ->
+      | Api.Exercise (Some token, id, js) ->
           (Exercise.Status.is_open id token >>= function
           | `Open | `Deadline _ as o ->
               Exercise.Meta.get id >>= fun meta ->
               Exercise.get id >>= fun ex ->
+              let ex = Learnocaml_exercise.strip js ex in
               respond_json cache
                 (meta, ex,
                  match o with `Deadline t -> Some (max t 0.) | `Open -> None)
           | `Closed ->
              lwt_fail (`Forbidden, "Exercise closed"))
-      | Api.Exercise (None, _) ->
+      | Api.Exercise (None, _, _) ->
          lwt_fail (`Forbidden, "Forbidden")
 
       | Api.Lesson_index () ->
@@ -1203,8 +1204,11 @@ let launch () =
   >>= fun () ->
   let callback conn req body =
     let uri = Request.uri req in
-    let path = Uri.path uri in
-    let path = Stringext.split ~on:'/' path in
+    let path =
+        Uri.path uri |>
+        Uri.pct_decode |> (* %-decoding must happen before `/`-splitting *)
+        Stringext.split ~on:'/'
+    in
     let path =
       let rec clean = function
         | [] | [_] as l -> l
@@ -1213,7 +1217,6 @@ let launch () =
       in
       clean path
     in
-    let path = List.map Uri.pct_decode path in
     let query = Uri.query uri in
     let args = List.map (fun (s, l) -> s, String.concat "," l) query in
     let use_compression =
@@ -1347,3 +1350,35 @@ let launch () =
   | e ->
       Printf.eprintf "Server error: %s\n%!" (Printexc.to_string e);
       Lwt.return false
+
+let check_running () =
+  try
+    let ic = Printf.ksprintf Unix.open_process_in "lsof -ti tcp:%d -s tcp:LISTEN" !port in
+    let pid = match input_line ic with
+      | "" -> None
+      | s -> int_of_string_opt s
+      | exception End_of_file -> None
+    in
+    close_in ic;
+    pid
+  with Unix.Unix_error _ ->
+    Printf.eprintf "Warning: could not check for previously running instance";
+    None
+
+let kill_running pid =
+  let timeout = 15 in
+  Unix.kill pid Sys.sigint;
+  Printf.eprintf "Waiting for process %d to terminate... %2d %!" pid timeout;
+  let rec aux tout =
+    Printf.eprintf "\027[3D%2d %!" tout;
+    if Printf.ksprintf Sys.command "lsof -ti tcp:%d -p %d >/dev/null" !port pid
+       = 0
+    then
+      if tout <= 0 then
+        (prerr_endline "Error: process didn't terminate in time"; exit 10)
+      else
+        (Unix.sleep 1;
+         aux (tout - 1))
+  in
+  aux timeout;
+  prerr_endline "\027[3Dok "

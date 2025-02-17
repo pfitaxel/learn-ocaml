@@ -7,8 +7,8 @@ lessons and tutorials.
 
 A demo is available [online](https://ocaml-sf.org/learn-ocaml-public/).
 
-[![CI](https://github.com/ocaml-sf/learn-ocaml/workflows/CI/badge.svg?branch=master)](https://github.com/ocaml-sf/learn-ocaml/actions?query=workflow%3ACI)
-[![macOS](https://github.com/ocaml-sf/learn-ocaml/workflows/macOS/badge.svg?branch=master)](https://github.com/ocaml-sf/learn-ocaml/actions?query=workflow%3AmacOS)
+[![CI](https://github.com/ocaml-sf/learn-ocaml/actions/workflows/build-and-test.yml/badge.svg?branch=master)](https://github.com/ocaml-sf/learn-ocaml/actions/workflows/build-and-test.yml)
+[![macOS](https://github.com/ocaml-sf/learn-ocaml/actions/workflows/build-macos.yml/badge.svg?branch=master)](https://github.com/ocaml-sf/learn-ocaml/actions/workflows/build-macos.yml)
 [![learn-ocaml](https://img.shields.io/badge/docker-ocamlsf%2Flearn--ocaml-blue.svg)](https://hub.docker.com/r/ocamlsf/learn-ocaml "Docker image of learn-ocaml")
 [![learn-ocaml-client](https://img.shields.io/badge/docker-ocamlsf%2Flearn--ocaml--client-blue.svg)](https://hub.docker.com/r/ocamlsf/learn-ocaml-client "Docker image of learn-ocaml-client")
 
@@ -53,7 +53,7 @@ The Inconsolata font is released under the Open Font License.
 See [http://www.levien.com/type/myfonts/inconsolata.html](http://www.levien.com/type/myfonts/inconsolata.html).
 
 The Biolinum font is licensed under the GNU General Public License with
-a the 'Font-Exception'.
+a 'Font-Exception'.
 See [http://www.linuxlibertine.org](http://www.linuxlibertine.org).
 
 The public instance of Learn OCaml uses the Fontin font instead of
@@ -78,9 +78,9 @@ It was written by OCamlPro from 2015 to 2018.
 
 The current main contributors are Érik Martin-Dorel, Yann Régis-Gianas, and Louis Gesbert.
 
-The initial authors were Benjamin Canou, Çağdaş Bozman, and Grégoire Henry.
+The initial authors were Benjamin Canou, Çağdaş Bozman, Grégoire Henry, and Louis Gesbert.
 
-It builds on the previous experience of Try OCaml, by Çağdaş Bozman, and Fabrice Le Fessant.
+It builds on the previous experience of Try OCaml, by Çağdaş Bozman and Fabrice Le Fessant.
 
 We heavily use js_of_ocaml, so thanks to the Ocsigen team.
 

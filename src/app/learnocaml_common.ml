@@ -1,6 +1,6 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019-2022 OCaml Software Foundation.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
  * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
@@ -843,6 +843,7 @@ let set_string_translations_view () =
     "learnocaml-exo-button-stats", [%i"Stats"];
     "learnocaml-exo-button-list", [%i"Exercises"];
     "learnocaml-exo-button-report", [%i"Report"];
+    "learnocaml-exo-button-draft", [%i"Draft"];
     "learnocaml-exo-button-text", [%i"Subject"];
     "learnocaml-exo-button-editor", [%i"Answer"];
   ] in set_inner_list translations

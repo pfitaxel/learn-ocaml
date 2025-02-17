@@ -1,4 +1,3 @@
-(lang dune 2.3)
+(lang dune 3.6)
 (name learn-ocaml)
-(version 0.15.0)
-(allow_approximate_merlin)
+(version 1.1.0)

@@ -1,6 +1,6 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
  * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
@@ -299,13 +299,13 @@ let rec teacher_tab token _select _params () =
               H.td [stars_div meta.Exercise.Meta.stars];
               H.td [
                 let cls, text =
-                  match Token.Map.is_empty ES.(st.assignments.token_map),
-                        ES.(st.assignments.default) with
-                  | true, ES.Open -> "exo_open", [%i"Open"]
-                  | true, ES.Closed -> "exo_closed", [%i"Closed"]
-                  | _, (ES.Assigned _ | ES.Closed) ->
-                      "exo_assigned", [%i"Assigned"]
-                  | false, ES.Open -> "exo_assigned", [%i"Open/Assg"]
+                  let open ES in
+                  match is_open_or_assigned_globally st.assignments with
+                  | GloballyOpen -> "exo_open", [%i"Open"]
+                  | GloballyOpenOrAssigned -> "exo_assigned", [%i"Open/Assigned"]
+                  | GloballyClosedOrAssigned -> "exo_assigned", [%i"Assigned"]
+                  | GloballyClosed -> "exo_closed", [%i"Closed"]
+                  | GloballyInconsistent -> "exo_closed", [%i"Inconsistent"]
                 in
                 H.span ~a:[H.a_class [cls]] [H.txt text]
               ];
@@ -856,17 +856,13 @@ let rec teacher_tab token _select _params () =
           let ids = htbl_keys selected_exercises in
           let fstat =
             if List.exists (fun id ->
-                let st = get_status id in
-                ES.(default_assignment st.assignments = Open))
+                   let st = get_status id in
+                   let open_assg = ES.is_open_or_assigned_globally st.ES.assignments in
+                   open_assg = ES.GloballyOpen || open_assg = ES.GloballyOpenOrAssigned
+                   || open_assg = ES.GloballyInconsistent)
                 ids
-            then ES.(fun assg ->
-                match default_assignment assg with
-                | Open -> set_default_assignment assg Closed
-                | _ -> assg)
-            else ES.(fun assg ->
-                match default_assignment assg with
-                | Closed -> set_default_assignment assg Open
-                | _ -> assg)
+            then ES.set_close_or_assigned_globally
+            else ES.set_open_or_assigned_globally
           in
           !exercise_status_change (htbl_keys selected_exercises) fstat;
           true)
@@ -1036,73 +1032,23 @@ let rec teacher_tab token _select _params () =
          current_assignment)
   in
   let set_assignment ?assg ?students ?exos ?default id =
+    (* - get the currently saved assignment *)
     let (assg0, students0, exos0, default0) = Hashtbl.find assignments_tbl id in
+    (* - update the assignment fields if related arg <> None *)
     let dft x0 = function Some x -> x | None -> x0 in
     let start, stop = dft assg0 assg in
     let students = dft students0 students in
     let exos = dft exos0 exos in
     let default = dft default0 default in
+    (* - update the assignment *)
     Hashtbl.replace assignments_tbl id
       ((start, stop), students, exos, default);
     (match Manip.by_id (assg_line_id id) with
      | Some l -> Manip.replaceSelf l (assignment_line id)
      | None -> failwith "Assignment line not found");
-    let status = ES.(Assigned {start; stop}) in
+    (* - update (!status_changes : ES.t SMap.t) (initially empty) *)
     let exercise_status_changes =
-      SSet.fold (fun ex_id acc ->
-          let st = get_status ex_id in
-          let assg = st.ES.assignments in
-          let old_default = assg.ES.default in
-          let new_default =
-            if default then status
-            else if default0 then ES.Closed
-            else old_default
-          in
-          let add tk st tmap =
-            if st = new_default then tmap
-            else Token.Map.add tk st tmap
-          in
-          let token_map =
-            Token.Map.fold (fun tk _ acc ->
-                if Token.Set.mem tk students then
-                  if default then acc
-                  else Token.Map.add tk status acc
-                else if Token.Set.mem tk students0 then
-                  if default then Token.Map.add tk ES.Closed acc
-                  else Token.Map.remove tk acc
-                else add tk (ES.get_status tk assg) acc)
-              !students_map Token.Map.empty
-          in
-          SMap.add ex_id
-            ES.{st with assignments = {
-                token_map;
-                default = new_default;
-              }}
-            acc)
-        exos
-        !status_changes
-    in
-    let exercise_status_changes =
-      SSet.fold (fun ex_id acc ->
-          let st = get_status ex_id in
-          let assg = st.ES.assignments in
-          let dft_status =
-            if default0 then ES.Closed else ES.default_assignment assg
-          in
-          let token_map =
-            Token.Set.fold Token.Map.remove students0 assg.ES.token_map
-          in
-          let token_map =
-            Token.Map.filter (fun _ a -> a <> dft_status) token_map
-          in
-          SMap.add ex_id
-            ES.{st with assignments = {
-                token_map;
-                default = dft_status
-              }}
-            acc)
-        (SSet.diff exos0 exos)
-        exercise_status_changes
+      ES.update_exercise_assignments get_status (students0, exos0, default0) (students, exos, default) (start, stop) !students_map !status_changes
     in
     status_changes := exercise_status_changes;
     fill_exercises_pane ();
@@ -1330,7 +1276,11 @@ let rec teacher_tab token _select _params () =
     in
     let open_exercises =
       SMap.fold (fun ex st acc ->
-          if ES.(st.assignments.default = Open) then ex::acc else acc)
+          let open ES in
+          let global_st = is_open_or_assigned_globally st.assignments in
+          if global_st = GloballyOpen
+             || global_st = GloballyOpenOrAssigned
+          then ex :: acc else acc)
         !status_map []
       |> List.rev
     in

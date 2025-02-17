@@ -226,8 +226,65 @@ module Exercise: sig
 
     val set_default_assignment: assignments -> status -> assignments
 
+    val make_assignments:
+      status Token.Map.t -> status -> assignments
+
     val get_status:
       Token.t -> assignments -> status
+
+    (** Global assignment status, w.r.t. all students as a whole
+
+        Invariants: forall exo_status : t,
+
+        1.(REQUIRED):
+        (exo_status.assignments.default <> Open && Token.Map.for_all (fun _ st -> st <> Open) exo_status.assignments.token_map)
+        || (exo_status.assignments.default <> Closed && Token.Map.for_all (fun _ st -> st <> Closed) exo_status.assignments.token_map)
+
+        2.(IfNormalized):
+        is_open_assigned_globally exo_status.assignments \in \{GloballyOpen, GloballyClosed\} ->
+        exo_status.assignments.token_map = Token.Map.empty *)
+    type global_status =
+      | GloballyOpen             (** "Open" *)
+      | GloballyClosed           (** "Closed" *)
+      | GloballyOpenOrAssigned   (** "Open/Assigned" *)
+      | GloballyClosedOrAssigned (** "Assigned" *)
+      | GloballyInconsistent     (** "Inconsistent" *)
+
+    val is_open_or_assigned_globally: assignments -> global_status
+
+    (** Close assignments status globally (for all unassigned students), namely:
+        - GloballyOpen -> GloballyClosed
+        - GloballyOpenOrAssigned -> GloballyClosedOrAssigned
+        - other -> no-op *)
+    val set_close_or_assigned_globally: assignments -> assignments
+
+    (** Open assignments status globally (for all unassigned students), namely:
+        - GloballyClosed -> GloballyOpen
+        - GloballyClosedOrAssigned -> GloballyOpenOrAssigned
+        - other -> no-op *)
+    val set_open_or_assigned_globally: assignments -> assignments
+
+    (** Check if the assignments map and default comply with the invariants.
+        Return false if there are at least one Open and at least one Closed. *)
+    val check_open_close: assignments -> bool
+
+    (** Replace all Open with Closed (or conversly if close=false). *)
+    val fix_open_close: ?close:bool -> assignments -> assignments
+
+    (** Call [check_open_close] then (if need be) [fix_open_close] *)
+    val check_and_fix_open_close: assignments -> assignments
+
+    (** Update [status_map: Exercise.Status.t SMap.t] if an assignment changes:
+        [update_exercise_assignments g (s0,e0,d0) (s,e,d) (t0,t1) m status_map]
+        turns [(stu0,exo0,dft0)] to [(s,e,d) + Assigned{t0;t1}] in [status_map]
+        from [g = get_status_t: string -> t] (status of exo) and [m = stud_map] *)
+    val update_exercise_assignments: (string -> t) ->
+      Token.Set.t * SSet.t * bool ->
+      Token.Set.t * SSet.t * bool ->
+      float * float ->
+      Student.t Token.Map.t ->
+      t SMap.t ->
+      t SMap.t
 
     val is_open_assignment:
       Token.t -> assignments -> [> `Open | `Closed | `Deadline of float]
@@ -263,9 +320,6 @@ module Exercise: sig
         same student) *)
     val three_way_merge:
       ancestor:t -> theirs:t -> ours:t -> t
-
-    val make_assignments:
-      status Token.Map.t -> status -> assignments
 
     val enc: t Json_encoding.encoding
 
@@ -325,6 +379,9 @@ module Exercise: sig
     (** Computes a set of exercises that appear as dependencies of the given
         exercise. *)
     val compute_exercise_set : node -> string list
+
+    (** Fold function that handles every exercise's dependency before handling exercise itself *)
+    val fold : ('a -> node -> 'a) -> 'a -> node list -> 'a
 
     (** Dumps the graph as a `dot` representation, into the given formatter. *)
     val dump_dot : Format.formatter -> node list -> unit

@@ -8,8 +8,17 @@ build-deps:
 	opam install . --deps-only --locked
 
 .PHONY: build
+# cf. man 5 dune-config
 build:
-	@${DUNE} build ${DUNE_ARGS}
+	@${DUNE} build ${DUNE_ARGS} --display=short
+
+.PHONY: test
+test:
+	@${DUNE} runtest --root .
+
+.PHONY: test-promote
+test-promote:
+	@${DUNE} runtest --root . --auto-promote
 
 .PHONY: static
 static:
@@ -45,7 +54,7 @@ translations/$(LANGS:=.pot):
 	@DUMP_POT=1 ${DUNE} build ${DUNE_ARGS} -j 1
 	@for f in $(LANGS); do \
 	  mv translations/$$f.pot translations/$$f.pot.bak; \
-	  msguniq -t utf-8 translations/$$f.pot.bak > translations/$$f.pot \
+	  msguniq --no-wrap -t utf-8 translations/$$f.pot.bak > translations/$$f.pot \
 	  && rm translations/$$f.pot.bak; \
 	done
 
@@ -53,7 +62,7 @@ translations/$(LANGS:=.pot):
 
 # Updates existing translations (.po) for the latest source template
 update-%-translation: translations/%.pot
-	@msgmerge -U translations/$*.po translations/$*.pot
+	@msgmerge --no-wrap -U translations/$*.po translations/$*.pot
 	@rm -f translations/$*.pot
 
 opaminstall: install
@@ -62,7 +71,7 @@ REPO ?= demo-repository
 
 testrun: build install
 	rm -rf www/css
-	learn-ocaml build --repo $(REPO) -j1
+	learn-ocaml build --repo $(REPO)
 	rm -rf www/css
 	ln -s ../static/css www
 	LEARNOCAML_SERVER_NOCACHE=1 learn-ocaml serve
@@ -74,7 +83,7 @@ docker-images: Dockerfile learn-ocaml.opam
 	@docker build -t learn-ocaml-compilation --target compilation docker
 	@docker build -t learn-ocaml --target program docker
 	@docker build -t learn-ocaml-client --target client docker
-	@echo "Use with 'docker run --rm -v \$$PWD/sync:/sync -v \$$PWD:/repository -p PORT:8080 learn-ocaml -- ARGS'"
+	@echo "Use with 'docker run --rm -v learn-ocaml-sync:/sync -v \$$PWD:/repository -p PORT:8080 learn-ocaml -- ARGS'"
 
 VERSION = $(shell opam show ./learn-ocaml.opam -f version)
 
