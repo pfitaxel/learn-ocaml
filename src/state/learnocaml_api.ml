@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -9,6 +9,87 @@
 open Learnocaml_data
 
 let version = Learnocaml_version.v
+
+module type COMPAT = sig
+  (** List-based versions endowed with a lexicographic order. *)
+  type t
+
+  val to_string : t -> string
+
+  (** Supported formats: [Compat.v "str"] where "str" is nonempty and
+      either "n", "-n" (a signed integer), or "n.str".
+      However, [Compat.v "0.14.rc1"] or so is not supported for now. *)
+  val v : string -> t
+
+  (** Note that trailing zeros are ignored, i.e. (v "1") and (v "1.0")
+      are equal versions. But (v "1") is higher than (v "1.-1"), itself
+      higher than (v "1.-2"), and so on. *)
+  val le : t -> t -> bool
+
+  val eq : t -> t -> bool
+
+  val lt : t -> t -> bool
+
+  type pred =
+    | Since of t | Upto of t | And of pred * pred
+
+  val compat : pred -> t -> bool
+end
+
+module Compat: COMPAT = struct
+
+  (** List-based versions endowed with a lexicographic order. *)
+  type t = int list
+
+  let to_string = function
+    | [] -> failwith "Compat.to_string"
+    | n :: l ->
+       List.fold_left (fun r e -> r ^ "." ^ string_of_int e) (string_of_int n) l
+
+  (** Supported formats: [Compat.v "str"] where "str" is nonempty and
+      either "n", "-n" (a signed integer), or "n.str".
+      However, [Compat.v "0.14.rc1"] or so is not supported for now. *)
+  let v = function
+    | "" -> failwith "Compat.of_string"
+    | s -> String.split_on_char '.' s |> List.map int_of_string
+
+  (** Note that trailing zeros are ignored, i.e. (v "1") and (v "1.0")
+      are equal versions. But (v "1") is higher than (v "1.-1"), itself
+      higher than (v "1.-2"), and so on. *)
+  let rec le v1 v2 = match v1, v2 with
+    | [], [] -> true
+    | [], 0 :: l2 ->  le [] l2
+    | [], n2 :: _ -> 0 < n2
+    | 0 :: l1, [] -> le l1 []
+    | n1 :: _, [] -> n1 < 0
+    | n1 :: l1, n2 :: l2 -> n1 < n2 || (n1 = n2 && le l1 l2)
+
+  let eq v1 v2 = le v1 v2 && le v2 v1
+
+  let lt v1 v2 = not (le v2 v1)
+
+  type pred =
+    | Since of t (** >= v0 *)
+    | Upto of t  (** < v1 *)
+    | And of pred * pred
+
+  let rec compat pred v =
+    match pred with
+    | Since v0 -> le v0 v
+    | Upto v1 -> lt v v1
+    | And (pred1, pred2) -> compat pred1 v && compat pred2 v
+
+end
+
+(* Tests
+assert Compat.(le (v "0.12") (v "0.13.0"));;
+assert Compat.(le (v "0.13.0") (v "0.13.1"));;
+assert Compat.(le (v "0.13.1") (v "0.14.0"));;
+assert Compat.(le (v "0.14.0") (v "1.0.0"));;
+assert Compat.(le (v "1.1.1") (v "1.1.1"));;
+assert Compat.(le (v "0.2") (v "0.10"));;
+assert Compat.(le (v "1.9.5") (v "1.10.0"));;
+ *)
 
 type _ request =
   | Static:
@@ -20,7 +101,7 @@ type _ request =
   | Create_token:
       string * student token option * string option -> student token request
   | Create_teacher_token:
-      teacher token -> teacher token request
+      teacher token * string option -> teacher token request
   | Create_user:
       string * string * string * string -> unit request
   | Login:
@@ -53,7 +134,8 @@ type _ request =
   | Exercise_index:
       'a token option -> (Exercise.Index.t * (Exercise.id * float) list) request
   | Exercise:
-      'a token option * string -> (Exercise.Meta.t * Exercise.t * float option) request
+      'a token option * string * bool ->
+      (Exercise.Meta.t * Exercise.t * float option) request
 
   | Lesson_index:
       unit -> (string * string) list request
@@ -113,11 +195,81 @@ type _ request =
   | Upgrade:
       string -> string request
   | Server_config:
-      unit -> bool request
+      unit -> (string * string) list request
+
+  | Exercise_score:
+      Token.t -> (string * int) list request
+
+  | Set_nickname:
+      Token.t * string -> unit request
 
   | Invalid_request:
       string -> string request
 
+let supported_versions 
+    : type resp. resp request -> Compat.pred
+  = fun req ->
+  match req with 
+  | Static _
+  | Version _
+  | Nonce _
+  | Create_token (_,_,_)
+  | Create_teacher_token _
+  | Fetch_save _
+  | Archive_zip _
+  | Update_save (_,_)
+  | Git (_,_)
+  | Students_list _
+  | Set_students_list (_,_)
+  | Students_csv (_,_,_)
+  | Exercise_index _
+  | Exercise (_, _, _)
+  | Lesson_index _
+  | Lesson _
+  | Tutorial_index _
+  | Tutorial _
+  | Playground_index _
+  | Playground _
+  | Exercise_status_index _
+  | Exercise_status (_,_)
+  | Set_exercise_status (_,_)
+  | Partition (_,_,_,_)
+  | Invalid_request _ -> Compat.(Since (v "0.12"))
+  | Create_user (_,_,_,_)
+  | Login (_,_)
+  | Can_login _
+  | Launch _
+  | Launch_token _
+  | Launch_login _
+  | Launch_direct _
+  | Is_moodle_account _
+  | Change_email _
+  | Abort_email_change _
+  | Confirm_email _
+  | Change_password _
+  | Send_reset_password _
+  | Reset_password _
+  | Do_reset_password _
+  | Get_emails _
+  | Upgrade_form _
+  | Upgrade _
+  | Server_config _
+  | Exercise_score _
+  | Set_nickname (_,_) -> Compat.(Since (v "0.15.0"))
+
+let is_supported
+  : type resp. ?current:Compat.t -> server:Compat.t -> resp request ->
+         (unit, string) result =
+  fun ?(current = Compat.v Learnocaml_version.v) ~server request ->
+  let supp = supported_versions request in
+  if Compat.(compat (Since server) current) (* server <= current *)
+     && Compat.compat supp current (* request supported by current codebase *)
+     && Compat.compat supp server (* request supported by server *)
+  then Ok () else
+    Error (Printf.sprintf
+             {|API request not supported by server v.%s using client v.%s|}
+             (* NOTE: we may want to add some string_of_request call as well *)
+             (Compat.to_string server) (Compat.to_string current))
 
 type http_request = {
   meth: [ `GET | `POST of string];
@@ -219,10 +371,13 @@ module Conversions (Json: JSON_CODEC) = struct
       | Upgrade_form _ -> str
       | Upgrade _ -> str
 
-      | Server_config () -> json J.bool
+      | Server_config () -> json J.(assoc string)
 
-      | Invalid_request _ ->
-          str
+      | Exercise_score _ -> json J.(assoc int)
+
+      | Set_nickname _ -> json J.unit
+
+      | Invalid_request _ -> str
 
   let response_encode r = fst (response_codec r)
   let response_decode r = snd (response_codec r)
@@ -231,11 +386,11 @@ module Conversions (Json: JSON_CODEC) = struct
   let to_http_request
     : type resp. resp request -> http_request
     =
-    let get ?token path = {
+    let get ?token ?(args=[]) path = {
       meth = `GET;
       host = "";
       path;
-      args = match token with None -> [] | Some t -> ["token", Token.to_string t];
+      args = (match token with None -> [] | Some t -> ["token", Token.to_string t]) @ args;
     } in
     let post ?token path body = {
       meth = `POST body;
@@ -254,9 +409,10 @@ module Conversions (Json: JSON_CODEC) = struct
     | Create_token (secret_candidate, token, nick) ->
         get ?token (["sync"; "new"; secret_candidate] @
                     (match nick with None -> [] | Some n -> [n]))
-    | Create_teacher_token token ->
+    | Create_teacher_token (token, nick) ->
         assert (Token.is_teacher token);
-        get ~token ["teacher"; "new"]
+        get ~token (["teacher"; "new"] @
+          (match nick with None -> [] | Some n -> [n]))
     | Create_user (email, nick, passwd, secret_candidate) ->
         post (["sync"; "new_user"])
           (Json.encode
@@ -307,10 +463,13 @@ module Conversions (Json: JSON_CODEC) = struct
     | Exercise_index None ->
        get ["exercise-index.json"]
 
-    | Exercise (Some token, id) ->
-       get ~token ("exercises" :: String.split_on_char '/' (id^".json"))
-    | Exercise (None, id) ->
+    | Exercise (Some token, id, js) ->
+       get ~token
+         ("exercises" :: String.split_on_char '/' (id^".json"))
+         ~args:["mode", if js then "js" else "byte"]
+    | Exercise (None, id, js) ->
        get ("exercises" :: String.split_on_char '/' (id^".json"))
+         ~args:["mode", if js then "js" else "byte"]
 
     | Lesson_index () ->
         get ["lessons.json"]
@@ -370,7 +529,13 @@ module Conversions (Json: JSON_CODEC) = struct
        post ["do_upgrade"] body
 
     | Server_config () ->
-       get ["get_server_config"]
+       get ["server_config"]
+
+    | Exercise_score token ->
+       get ~token ["exercise-score.json"]
+
+    | Set_nickname (token, nickname) ->
+        post ~token ["set_nickname"] nickname
 
     | Invalid_request s ->
         failwith ("Error request "^s)
@@ -416,7 +581,9 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
       | `GET, ["sync"; "new"; secret_candidate; nick], token ->
           Create_token (secret_candidate, token, Some nick) |> k
       | `GET, ["teacher"; "new"], Some token when Token.is_teacher token ->
-          Create_teacher_token token |> k
+          Create_teacher_token (token, None) |> k
+      | `GET, ["teacher"; "new"; nick], Some token when Token.is_teacher token ->
+          Create_teacher_token (token, Some nick) |> k
       | `POST body, ["sync"; "new_user"], _ ->
          (match Json.decode J.(tup4 string string string string) body with
           | email, nick, password, secret ->
@@ -474,7 +641,8 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
                (match token with
                 | Some token ->
                     let id = Filename.chop_suffix (String.concat "/" path) ".json" in
-                    Exercise (Some token, id) |> k
+                    let js = List.assoc_opt "mode" request.args = Some "js" in
+                    Exercise (Some token, id, js) |> k
                 | None -> Invalid_request "Missing token" |> k)
            | Some "" ->
                Static ["exercise.html"] |> k
@@ -492,6 +660,9 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
 
       | `POST body, ["launch"; "direct"], _ ->
          Launch_direct body |> k
+
+      | `GET, ("redirection"::_path), _ ->
+         Static ["redirection.html"] |> k
 
       | `GET, ("description"::_path), _token ->
          (* match token with
@@ -556,8 +727,14 @@ module Server (Json: JSON_CODEC) (Rh: REQUEST_HANDLER) = struct
       | `POST body, ["do_upgrade"], _ ->
          Upgrade body |> k
 
-      | `GET, ["get_server_config"], _ ->
+      | `GET, ["server_config"], _ ->
          Server_config () |> k
+
+      | `GET , ["exercise-score.json"], Some token ->
+         Exercise_score token |> k
+
+      | `POST body, ["set_nickname"], Some token ->
+         Set_nickname (token, body) |> k
 
       | `GET, ["teacher"; "exercise-status.json"], Some token
         when Token.is_teacher token ->

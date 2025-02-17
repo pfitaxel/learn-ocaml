@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 
 <head>
@@ -6,8 +6,9 @@
     <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1">
     <title>Learn OCaml by OCamlPro - Description</title>
     <link rel="stylesheet" href="/css/learnocaml_common.css">
-    <link rel="stylesheet" href="/css/learnocaml_standalone_description.css">
+    <link rel="stylesheet" href="/css/learnocaml_tryocaml.css">
     <link rel="stylesheet" href="/css/learnocaml_description.css">
+    <!-- <link rel="stylesheet" href="/css/learnocaml_standalone_description.css"> -->
 
     <script src="/js/ace/ace.js" type="text/javascript" charset="utf-8" defer></script>
     <!-- var editor = ace.edit("learnocaml-exo-editor-pane"); -->
@@ -18,11 +19,31 @@
 </head>
 
 <body>
+    <!-- Should be kept untouched. -->
+    <div style="display:none">
+      <!-- (Weakly) preload images. -->
+      <img src="/icons/tryocaml_loading_1.gif"><img src="/icons/tryocaml_loading_2.gif">
+      <img src="/icons/tryocaml_loading_3.gif"><img src="/icons/tryocaml_loading_4.gif">
+      <img src="/icons/tryocaml_loading_5.gif"><img src="/icons/tryocaml_loading_6.gif">
+      <img src="/icons/tryocaml_loading_7.gif"><img src="/icons/tryocaml_loading_8.gif">
+      <img src="/icons/tryocaml_loading_9.gif">
+    </div>
+    <!-- Three states: .initial, .loading and .loaded.
+         Set to .loaded when initial loading finished.
+         Set to .loading while loading, then to .loaded. -->
+    <div id="learnocaml-exo-loading" class="loading-layer initial">
+      <div id="chamo"><img id="chamo-img" src="/icons/tryocaml_loading_5.gif"></div>
+      <div class="messages"><ul><li id="txt_preparing">Preparing the environment</li></ul></div>
+    </div>
+    <script language="JavaScript">
+      var n = Math.floor (Math.random () * 8.99) + 1;
+      document.getElementById('chamo-img').src = learnocaml_config.baseUrl + '/icons/tryocaml_loading_' + n + '.gif';
+    </script>
+    <!-- Anything below could be recreated dynamically, but IDs must be kept. -->
     <div id="learnocaml-exo-toolbar">
         <div class="logo">
-            <img src="/icons/logo_ocaml.svg">
-            <span>Learn OCaml</span>
             <img src="/icons/logo_ocsf.svg">
+            <span>Learn OCaml</span>
         </div>
     </div>
     <div id="learnocaml-exo-tab-buttons">
@@ -34,7 +55,11 @@
     <div id="learnocaml-exo-tabs">
       <div id="learnocaml-exo-tab-meta" class="front-tab"></div>
       <div id="learnocaml-exo-tab-meta-sep"></div>
-      <div id="learnocaml-exo-tab-text"></div>
+      <div id="learnocaml-exo-tab-text">
+        <div id="learnocaml-exo-tab-text-title"></div>
+        <div id="learnocaml-exo-tab-text-prelude"></div>
+        <div id="learnocaml-exo-tab-text-descr"></div>
+      </div>
     </div>
 </body>
 

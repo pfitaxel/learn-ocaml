@@ -14,30 +14,61 @@ on:
 jobs:
   build_test_server:
     name: Build learn-ocaml and run tests
+    if: ${{ github.event_name != 'schedule' || github.repository == 'ocaml-sf/learn-ocaml' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Build Docker images
         run: "make docker-images"
+      - name: Fix permissions
+        run: "chmod -R a+wX demo-repository"
       - name: Run learn-ocaml build on demo-repository
         run: "docker run --rm -v $(pwd)/demo-repository:/repository learn-ocaml -- build"
-      - name: Clone learn-ocaml-corpus
-        run: "mkdir tests/corpuses && cd tests/corpuses && git clone --depth=1 https://github.com/ocaml-sf/learn-ocaml-corpus.git && cd ../.."
-      - name: Run learn-ocaml build on learn-ocaml-corpus
+      - name: Clone learn-ocaml-corpus inside tests/corpuses
+        run: "git clone --depth=1 https://github.com/ocaml-sf/learn-ocaml-corpus.git tests/corpuses/learn-ocaml-corpus"
+      - name: Run tests
+        run: "tests/runtests.sh"
+
+  client_using_other_server:
+    name: Build learn-ocaml-client and run quick tests
+    if: ${{ github.event_name != 'schedule' || github.repository == 'ocaml-sf/learn-ocaml' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        server_image:
+          # - 'ocamlsf/learn-ocaml:0.12'
+          # - 'ocamlsf/learn-ocaml:0.13.0'
+          - 'learn-ocaml'  # use learn-ocaml image built from master
+    env:
+      USE_CLIENT_IMAGE: 'true'
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+      - name: Build Docker images
+        run: "make docker-images"
+      - name: Pull server_image
+        if: ${{ matrix.server_image != 'learn-ocaml' }}
+        run: "docker pull ${{ matrix.server_image }} && docker tag ${{ matrix.server_image }} learn-ocaml"
+      - name: Print images metadata
+        run: "docker inspect -f '{{json .Config.Labels}}' learn-ocaml-client learn-ocaml | jq"
+      - name: Run tests
         run: "cd tests && bash -c ./runtests.sh"
 
   build_extra_tests:
     name: Run dockerized tests
+    if: ${{ github.event_name != 'schedule' || github.repository == 'ocaml-sf/learn-ocaml' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         dockerfile:
           - 'Dockerfile.test-client'
+          - 'Dockerfile.test-server'
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Run docker build
         run: 'file=${{ matrix.dockerfile }} && docker build -t "learn-ocaml-${file#*.}" -f "$file" .'
 

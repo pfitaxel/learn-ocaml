@@ -1,12 +1,13 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2022 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
 open Js_of_ocaml
+open Js_of_ocaml_tyxml
 open Learnocaml_data
 
 val find_div_or_append_to_body : string -> [> Html_types.div ] Tyxml_js.Html.elt
@@ -51,7 +52,7 @@ val confirm :
 val ask_string :
   title: string ->
   ?ok_label: string ->
-  ?cancel_label: string option ->
+  ?may_cancel: bool ->
   [< Html_types.div_content > `Input] Tyxml_js.Html.elt list ->
   string Lwt.t
 
@@ -98,6 +99,7 @@ val disable_with_button_group :
   button_group -> unit
 
 val button :
+  ?id: string ->
   container: 'a Tyxml_js.Html.elt ->
   theme: string ->
   ?group: button_group ->
@@ -111,6 +113,16 @@ val dropdown :
   title: [< Html_types.button_content_fun > `PCDATA] Tyxml_js.Html.elt list ->
   [< Html_types.div_content_fun ] Tyxml_js.Html.elt list ->
   [> Html_types.div ] Tyxml_js.Html.elt
+
+val button_dropup :
+  container: 'a Tyxml_js.Html5.elt ->
+  theme: string ->
+  ?state: button_state ->
+  icon: string ->
+  id_menu: string ->
+  items: [< Html_types.div_content_fun ] Tyxml_js.Html.elt list ->
+  string -> (unit -> unit Lwt.t) ->
+  unit
 
 val render_rich_text :
   ?on_runnable_clicked: (string -> unit) ->
@@ -126,18 +138,22 @@ val set_state_from_save_file :
 (** Gets a save file containing the locally stored data *)
 val get_state_as_save_file : ?include_reports:bool -> unit -> Save.t
 
-(** Sync the local save state with the server state, and returns the merged save
-    file. The save will be created on the server if it doesn't exist.
+(**
+    [sync token on_sync] synchronizes the local save state with the server state,
+    and returns the merged save file. The save will be created on the server
+    if it doesn't exist. [on_sync ()] is called when this is done.
 
-    This syncs student {b,content}, but never the reports which are only synched
-    on "Grade" *)
-val sync: Token.t -> Save.t Lwt.t
+    Notice that this function synchronizes student {b,content} but not the
+    reports which are only synchronized when an actual "grading" is done.
+*)
+val sync: Token.t -> (unit -> unit) -> Save.t Lwt.t
 
 (** The same, but limiting the submission to the given exercise, using the given
     answer if any, and the given editor text, if any. *)
 val sync_exercise:
   Token.t option -> ?answer:Learnocaml_data.Answer.t -> ?editor:string ->
   Learnocaml_data.Exercise.id ->
+  (unit -> unit) ->
   Save.t Lwt.t
 
 val countdown:
@@ -205,7 +221,7 @@ val init_toplevel_pane :
    unit) ->
   unit
 
-val run_async_with_log : (unit -> 'a Lwt.t) -> unit
+val run_async_with_log : (unit -> unit Lwt.t) -> unit
 
 val mk_tab_handlers : string -> string list -> (unit -> unit) * (string -> unit)
 
@@ -214,11 +230,12 @@ module type Editor_info = sig
   val buttons_container : 'a Tyxml_js.Html5.elt
 end
 
-module Editor_button (E : Editor_info) : sig
+module Editor_button (_ : Editor_info) : sig
   val cleanup : string -> unit
+  val reload : Learnocaml_data.Token.t option Lwt.t -> string -> string -> unit
   val download : string -> unit
-  val eval : Learnocaml_toplevel.t -> (string -> 'a) -> unit
-  val sync : Token.t option Lwt.t -> Learnocaml_data.SMap.key -> unit
+  val eval : Learnocaml_toplevel.t -> (string -> unit) -> unit
+  val sync : Token.t option Lwt.t -> Learnocaml_data.SMap.key -> (unit -> unit) -> unit
 end
 
 val setup_editor : string -> Ocaml_mode.editor * Ocaml_mode.editor Ace.editor
@@ -229,12 +246,14 @@ val typecheck :
 
 val set_nickname_div : unit -> unit
 
+val setup_tab_text_prelude_pane : string -> unit
+
 val setup_prelude_pane : 'a Ace.editor -> string -> unit
 
-val get_token : ?has_server:bool -> unit -> Learnocaml_data.student Learnocaml_data.token option Lwt.t
+val get_token : ?has_server:bool -> unit -> Learnocaml_data.Token.t option Lwt.t
 
 module Display_exercise :functor
-  (Q : sig
+  (_ : sig
          val exercise_link :
            ?cl:string list ->
            string ->

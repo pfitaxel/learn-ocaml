@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -106,7 +106,7 @@ module Lesson = struct
   end
 
   include (Lesson: module type of struct include Lesson end
-           with module Index := Index)
+           with module Index := Lesson.Index)
 
   let get id =
     read_static_file (Learnocaml_index.lesson_path id) enc
@@ -125,7 +125,7 @@ module Playground = struct
   end
 
   include (Playground: module type of struct include Playground end
-           with module Index := Index)
+           with module Index := Playground.Index)
 
   let get id =
     read_static_file (Learnocaml_index.playground_path id) enc
@@ -156,7 +156,7 @@ module Tutorial = struct
   end
 
   include (Tutorial: module type of struct include Tutorial end
-           with module Index := Index)
+           with module Index := Tutorial.Index)
 
   let get id =
     read_static_file (Learnocaml_index.tutorial_path id) enc
@@ -191,7 +191,12 @@ module Exercise = struct
           List.iter (fun st -> Hashtbl.add tbl st.id st) l;
           tbl)
       @@ function
-      | Unix.Unix_error (Unix.ENOENT, _, _) -> Lwt.return tbl
+      | Unix.Unix_error (Unix.ENOENT, _, _) ->
+          Lazy.force !index >>= fun index ->
+          Exercise.Index.fold_exercises (fun () id _ ->
+              Hashtbl.add tbl id (Exercise.Status.default id))
+            () index;
+          Lwt.return tbl
       | e -> Lwt.fail e
     )
 
@@ -265,9 +270,9 @@ module Exercise = struct
 
   include (Exercise: module type of struct include Exercise end
            with type id := id
-            and module Meta := Meta
-            and module Status := Status
-            and module Index := Index)
+            and module Meta := Exercise.Meta
+            and module Status := Exercise.Status
+            and module Index := Exercise.Index)
 
   let get id =
     Lwt.catch
@@ -327,7 +332,9 @@ module Token = struct
 
   let register ?(allow_teacher=false) token =
     if not allow_teacher && is_teacher token then
-      Lwt.fail (Invalid_argument "Registration of teacher token not allowed")
+      Lwt.fail
+        (Invalid_argument "Registration of teacher token forbidden. \
+          Logout and use a new teacher token?")
     else
       Lwt.catch (fun () ->
           Lwt_io.with_file ~mode:Lwt_io.Output ~perm:0o700 (save_path token)
@@ -511,6 +518,6 @@ module Student = struct
   let set std = Index.set [std]
 
   include (Student: module type of struct include Student end
-           with module Index := Index)
+           with module Index := Student.Index)
 
 end

@@ -6,6 +6,7 @@
  * included LICENSE file for details. *)
 
 open Learnocaml_common
+open Js_of_ocaml
 
 let rec drop_2_trailing = function
   | [] | [_] | [_; _] -> []

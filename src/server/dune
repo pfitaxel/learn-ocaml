@@ -3,11 +3,11 @@
  (wrapped false)
  (flags :standard -warn-error +8)
  (modules Learnocaml_server)
- (libraries ocplib-json-typed
+ (libraries json-data-encoding
             ezjsonm
             lwt.unix
             lwt_utils
-            cohttp.lwt
+            cohttp-lwt-unix
             magic-mime
             sha
             checkseum.c
@@ -20,5 +20,6 @@
             token_index
             learnocaml_partition_create
             cryptokit
-            markup)
+            markup
+            base64)
 )

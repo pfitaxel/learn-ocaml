@@ -6,18 +6,16 @@
  * included LICENSE file for details. *)
 
 open Js_utils
+open Js_of_ocaml
 open Lwt
-open Learnocaml_data
 open Learnocaml_common
 
-module H = Tyxml_js.Html5
+module H = Js_of_ocaml_tyxml.Tyxml_js.Html5
 
 let check_email_js email =
-  let re = Regexp.regexp Learnocaml_data.email_regexp_js in
+  let re = Str.regexp Learnocaml_data.email_regexp_js in
   Learnocaml_data.email_check_length email
-  && match Regexp.string_match re email 0 with
-     | Some _ -> true
-     | None -> false
+  && Str.string_match re email 0
 
 let id s = s, find_component s
 

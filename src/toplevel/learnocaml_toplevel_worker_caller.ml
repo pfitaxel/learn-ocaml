@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -35,7 +35,7 @@ let wrap pp =
 
 module IntMap = Map.Make(struct
     type t = int
-    let compare (x:int) (y:int) = Pervasives.compare x y
+    let compare (x:int) (y:int) = compare x y
   end)
 let map_option f o = match o with | None -> None | Some o -> Some (f o)
 let iter_option f o = match o with | None -> () | Some o -> f o
@@ -59,7 +59,7 @@ type t = {
   mutable after_init: t -> unit Lwt.t;
   pp_stdout: string -> unit;
   pp_stderr: string -> unit;
-}
+} [@@ocaml.warning "-69"]
 
 
 exception Not_equal
@@ -138,11 +138,13 @@ let ty_of_host_msg : type t. t host_msg -> t msg_ty = function
   | Reset -> Unit
   | Execute _ -> Bool
   | Use_string _ -> Bool
+  | Use_compiled_string _ -> Bool
   | Use_mod_string _ -> Bool
   | Set_debug _ -> Unit
   | Check _ -> Unit
   | Set_checking_environment -> Unit
   | Register_callback _ -> Unit
+  | Load_cmi_from_string _ -> Unit
 
 (** Threads created with [post] will always be wake-uped by
     [onmessage] by calling [Lwt.wakeup]. They should never end with
@@ -232,7 +234,7 @@ let reset worker ?(timeout = fun () -> never_ending) () =
       worker.after_init worker
   | `Reset Toploop_results.Error (err, _) ->
       Lwt.cancel timeout;
-      worker.pp_stderr err.Toploop_results.msg;
+      worker.pp_stderr (Format.asprintf "%a" Location.print_report (Toploop_results.to_error err));
       worker.reset_worker worker
   | `Timeout ->
       (* Not canceling the Reset thread, but manually resetting. *)
@@ -250,6 +252,13 @@ let execute worker ?pp_code ~pp_answer ~print_outcome code =
   post worker @@
   Execute (pp_code, print_outcome, pp_answer, code) >>= fun result ->
   iter_option (close_fd worker) pp_code;
+  close_fd worker pp_answer;
+  Lwt.return result
+
+let use_compiled_string worker ~pp_answer code =
+  let pp_answer = create_fd worker pp_answer in
+  post worker @@
+  Use_compiled_string (pp_answer, code) >>= fun result ->
   close_fd worker pp_answer;
   Lwt.return result
 
@@ -275,3 +284,7 @@ let register_callback worker name callback =
   let fd = create_fd worker callback in
   post worker (Register_callback (name, fd)) >>? fun () ->
   return_unit_success
+
+let load_cmi_from_string worker cmi =
+  post worker @@
+  Load_cmi_from_string cmi

@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -132,7 +132,7 @@ end
 
 (** [Make], used in [Test_lib], provides a generic printer and sampler
     for argument lists of n-ary functions, depending on their type. *)
-module Make : functor (M : S) -> sig
+module Make : functor (_: S) -> sig
   val print :
     (('ar -> 'row) Ty.ty, 'ar -> 'urow, 'ret) fun_ty ->
     Format.formatter -> ('ar -> 'row, 'ar -> 'urow, 'ret) args -> unit

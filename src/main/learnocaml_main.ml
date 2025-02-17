@@ -1,14 +1,13 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
 open Lwt.Infix
-
-module StringSet = Set.Make(String)
+open Cmdliner
 
 let ( / ) = Filename.concat
 
@@ -23,8 +22,15 @@ let readlink f =
   try Sys.chdir cwd; f
   with Sys_error _ -> Sys.chdir (Filename.get_temp_dir_name ()); f
 
+let absolute_filename path =
+  (* Note: symlinks are not taken into account *)
+  if Filename.is_relative path
+  then Filename.concat (Sys.getcwd ()) path
+  else path
+
+let dflt_build_dir = "_learn-ocaml-build"
+
 module Args = struct
-  open Cmdliner
   open Arg
 
   type command = Grade | Build | Serve
@@ -37,24 +43,53 @@ module Args = struct
       ]) [Build; Serve] &
     info [] ~docs:"COMMANDS" ~docv:"COMMAND"
 
+  let docs = Manpage.s_common_options
+
   let repo_dir =
-    value & opt dir "." & info ["repo"] ~docv:"DIR" ~doc:
+    value & opt dir "." & info ["repo"] ~docs ~docv:"DIR" ~doc:
       "The path to the repository containing the exercises, lessons and \
        tutorials."
 
+  let build_dir =
+    value & opt dir ("./" ^ dflt_build_dir) & info ["build-dir"] ~docs ~docv:"DIR" ~doc:
+    (Printf.sprintf
+       "Directory where the repo exercises are copied and precompiled. \
+        When $(docv) takes its default value (e.g. when it is omitted in CLI), \
+        '$(b,learn-ocaml build)' first erases the '$(docv)/exercises' subfolder. \
+        Note that the default value for $(docv), './%s', is generally a sensible choice. \
+        But passing the same argument as the one for $(i,--repo) is also a valid value for $(docv)."
+     dflt_build_dir)
+
   let app_dir =
-    value & opt string "./www" & info ["app-dir"; "o"] ~docv:"DIR" ~doc:
+    value & opt string "./www" & info ["app-dir"; "o"] ~docs ~docv:"DIR" ~doc:
       "Directory where the app should be generated for the $(i,build) command, \
        and from where it is served by the $(i,serve) command."
 
   let base_url =
     value & opt string "" &
-      info ["base-url"] ~docv:"BASE_URL" ~env:(Arg.env_var "LEARNOCAML_BASE_URL") ~doc:
+      info ["base-url"] ~docs ~docv:"BASE_URL" ~env:(Cmd.Env.info "LEARNOCAML_BASE_URL") ~doc:
         "Set the base URL of the website. \
          Should not end with a trailing slash. \
          Currently, this has no effect on the backend - '$(b,learn-ocaml serve)'. \
          Mandatory for '$(b,learn-ocaml build)' if the site is not hosted in path '/', \
          which typically occurs for static deployment."
+
+  let serve_during_build =
+    value & flag &
+      info ["serve-during-build"] ~docs:"SERVER OPTIONS"
+        ~env:(Cmd.Env.info "LEARNOCAML_SERVE_DURING_BUILD") ~doc:
+        "If the directory specified by $(b,--app-dir) already exists from a \
+         previous build, create a temporary child process to serve it \
+         while the build completes, in order to reduce server downtime. \
+         This flag requires to run both commands '$(b,learn-ocaml build serve)'. \
+         After the build, the child process stops and a new server starts. \
+         This flag is useful in a docker-compose context, and can be enabled \
+         by adding to the environment: '$(env)=true'."
+
+  let child_pid =
+    (* Note: option `--child-pid` is specific to the native learn-ocaml-server,
+       hence this dummy value here, to avoid copying it in "SERVER OPTIONS". *)
+    Term.const (None: int option)
 
   module Grader = struct
     let info = info ~docs:"GRADER OPTIONS"
@@ -109,38 +144,40 @@ module Args = struct
     type t = {
       exercises: string list;
       output_json: string option;
+      display_callback: bool;
+      dump_outputs: string option;
+      dump_reports: string option;
     }
 
     let grader_conf =
-      let apply exercises output_json =
+      let apply exercises output_json quiet dump_outputs dump_reports =
         let exercises = List.flatten exercises in
-        { exercises; output_json }
+        { exercises; output_json; display_callback = not quiet;
+          dump_outputs; dump_reports }
       in
-      Term.(const apply $exercises $output_json)
+      Term.(const apply $exercises $output_json $quiet $dump_outputs $dump_reports)
 
     let grader_cli =
       let apply
-          grade_student display_outcomes quiet display_std_outputs
-          dump_outputs dump_reports timeout verbose dump_dot
+          grade_student display_outcomes display_std_outputs
+          timeout verbose dump_dot
         =
         Grader_cli.grade_student := grade_student;
         Grader_cli.display_outcomes := display_outcomes;
-        Grader_cli.display_callback := not quiet;
         Grader_cli.display_std_outputs := display_std_outputs;
-        Grader_cli.dump_outputs := dump_outputs;
-        Grader_cli.dump_reports := dump_reports;
         Grader_cli.individual_timeout := timeout;
         Grader_cli.display_reports := verbose;
         Grader_cli.dump_dot := dump_dot;
-        Learnocaml_process_exercise_repository.dump_outputs := dump_outputs;
-        Learnocaml_process_exercise_repository.dump_reports := dump_reports;
         ()
       in
-      Term.(const apply $grade_student $display_outcomes $quiet $display_std_outputs
-            $dump_outputs $dump_reports  $timeout $verbose $dump_dot)
+      Term.(const apply $grade_student $display_outcomes $display_std_outputs
+            $timeout $verbose $dump_dot)
 
     let term =
-      let apply conf () = conf in
+      let apply conf () =
+        Learnocaml_process_exercise_repository.dump_outputs := conf.dump_outputs;
+        Learnocaml_process_exercise_repository.dump_reports := conf.dump_reports;
+        conf in
       Term.(const apply $grader_conf $grader_cli)
   end
 
@@ -155,14 +192,18 @@ module Args = struct
       value & opt dir default & info ["contents-dir"] ~docv:"DIR" ~doc:
         "directory containing the base learn-ocaml app contents"
 
-    let enable opt doc =
+    (** [enable "opt" ~old["old";"very old"](*backward-compat opts*) "the.."] *)
+    let enable opt ?(old: string list = []) doc =
+      let f_on_off opt = ("enable-"^opt, "disable-"^opt) in
+      let on_opt, off_opt =
+        List.split (List.map f_on_off (opt :: old)) in
       value & vflag None [
-        Some true, info ["enable-"^opt] ~doc:("Enable "^doc);
-        Some false, info ["disable-"^opt] ~doc:("Disable "^doc);
+        Some true, info on_opt ~doc:("Enable "^doc);
+        Some false, info off_opt ~doc:("Disable "^doc);
       ]
 
-    let try_ocaml = enable "tryocaml"
-        "the 'TryOCaml' tab (enabled by default if the repository contains a \
+    let try_ocaml = enable "tutorials" ~old:["tryocaml"]
+        "the 'Tutorials' tab (enabled by default if the repository contains a \
          $(i,tutorials) directory)"
 
     let playground = enable "playground"
@@ -186,7 +227,7 @@ module Args = struct
          the entire repository. Can be repeated."
 
     let jobs =
-      value & opt int 1 & info ["jobs";"j"] ~docv:"INT" ~doc:
+      value & opt int 8 & info ["jobs";"j"] ~docv:"INT" ~doc:
         "Number of building jobs to run in parallel"
 
     type t = {
@@ -207,9 +248,10 @@ module Args = struct
       Term.(const apply $contents_dir $try_ocaml $lessons $exercises $playground $toplevel $base_url)
 
     let repo_conf =
-      let apply repo_dir exercises_filtered jobs =
+      let apply repo_dir build_dir exercises_filtered jobs =
         Learnocaml_process_exercise_repository.exercises_dir :=
-          repo_dir/"exercises";
+          (* not repo_dir/"exercises" here - since we need write permissions *)
+          build_dir/"exercises";
         Learnocaml_process_exercise_repository.exercises_filtered :=
           Learnocaml_data.SSet.of_list (List.flatten exercises_filtered);
         Learnocaml_process_tutorial_repository.tutorials_dir :=
@@ -219,7 +261,7 @@ module Args = struct
         Learnocaml_process_exercise_repository.n_processes := jobs;
         ()
       in
-      Term.(const apply $repo_dir $exercises_filtered $jobs)
+      Term.(const apply $repo_dir $build_dir $exercises_filtered $jobs)
 
     let term =
       let apply conf () = conf in
@@ -227,34 +269,44 @@ module Args = struct
   end
 
   module Server = struct
-    include Learnocaml_server_args
-    let info = info ~docs:"SERVER OPTIONS"
+    module Args = Learnocaml_server_args.Args(struct let section = "SERVER OPTIONS" end)
+    include Args
   end
 
   type t = {
     commands: command list;
     app_dir: string;
     repo_dir: string;
+    build_dir: string;
+    serve_during_build: bool;
     grader: Grader.t;
     builder: Builder.t;
     server: Server.t;
   }
 
-  let term =
-    let apply commands app_dir repo_dir grader builder server =
-      { commands; app_dir; repo_dir; grader; builder; server }
+  let term child_pid =
+    let apply commands app_dir repo_dir build_dir grader builder server serve_during_build =
+      { commands; app_dir; repo_dir; build_dir; grader; builder; server; serve_during_build }
     in
-    Term.(const apply $commands $app_dir $repo_dir
-          $Grader.term $Builder.term $Server.term app_dir base_url)
+    Term.(const apply $commands $app_dir $repo_dir $build_dir
+          $Grader.term $Builder.term $Server.term app_dir base_url child_pid $serve_during_build)
 end
 
 open Args
 
 let process_html_file orig_file dest_file base_url no_secret =
+  let add_prefix_unless_http prefix url =
+    let https = "https://" and http = "http://" in
+    let starts_with proto =
+      String.(sub url 0 (min (length proto) (length url))) = proto in
+    if starts_with https || starts_with http then url
+    else prefix ^ url in
   let transform_tag e tag attrs attr =
     let attr_pair = ("", attr) in
     match List.assoc_opt attr_pair attrs with
-    | Some url -> `Start_element ((e, tag), (attr_pair, base_url ^ url) :: (List.remove_assoc attr_pair attrs))
+    | Some url -> `Start_element ((e, tag),
+                                  (attr_pair, add_prefix_unless_http base_url url)
+                                  :: (List.remove_assoc attr_pair attrs))
     | None -> `Start_element ((e, tag), attrs) in
   Lwt_io.open_file ~mode:Lwt_io.Input orig_file >>= fun ofile ->
   Lwt_io.open_file ~mode:Lwt_io.Output dest_file >>= fun wfile ->
@@ -270,16 +322,21 @@ let process_html_file orig_file dest_file base_url no_secret =
               when no_secret && List.mem (("", "id"), "secret-section") attrs ->
             `Start_element ((e, "div"), (("", "style"), "display:none")::attrs)
          | t -> t)
-  |> Markup.pretty_print
   |> Markup.write_html
   |> Markup_lwt.to_lwt_stream
   |> Lwt_io.write_chars wfile >>= fun () ->
   Lwt_io.close ofile >>= fun () ->
   Lwt_io.close wfile
 
+let temp_app_dir o =
+  let open Filename in
+  concat
+    (dirname o.app_dir)
+    ((basename o.app_dir) ^ ".temp")
+
 let main o =
-  Printf.printf "Learnocaml v.%s running.\n" Learnocaml_api.version;
-  let grade () =
+  Printf.printf "Learnocaml v%s running.\n%!" Learnocaml_api.version;
+  let grade o =
     if List.mem Grade o.commands then
       (if List.mem Build o.commands || List.mem Serve o.commands then
          failwith "The 'grade' command is incompatible with 'build' and \
@@ -294,7 +351,11 @@ let main o =
            in
            Lwt.catch
              (fun () ->
-                Grader_cli.grade_from_dir ~print_result:true ex json_output
+                Grader_cli.grade_from_dir ~print_result:true
+                  ~dump_outputs:o.grader.Grader.dump_outputs
+                  ~dump_reports:o.grader.Grader.dump_reports
+                  ~display_callback:o.grader.Grader.display_callback
+                  ex json_output
                 >|= function Ok () -> i | Error _ -> 1)
              (fun e ->
                 Printf.ksprintf failwith
@@ -303,9 +364,78 @@ let main o =
        >|= fun i -> Some i)
     else Lwt.return_none
   in
-  let generate () =
+  let copy_build_exercises o =
+    (* NOTE: if `--build` = `--repo`, then no copy is needed.
+       Before checking path equality, we need to get canonical paths *)
+    let repo_exos_dir = readlink o.repo_dir / "exercises" in
+    let build_exos_dir = readlink o.build_dir / "exercises" in
+    if repo_exos_dir <> build_exos_dir then begin
+        (* NOTE: if the CLI arg is "./_learn-ocaml-build" or "_learn-ocaml-build"
+           then the exercises subdirectory is erased beforehand *)
+        begin
+          if (o.build_dir = dflt_build_dir || o.build_dir = "./" ^ dflt_build_dir)
+             && Sys.file_exists build_exos_dir then
+            Lwt.catch (fun () ->
+                Lwt_process.exec ("rm",[|"rm";"-rf"; build_exos_dir|]) >>= fun r ->
+                if r <> Unix.WEXITED 0 then
+                  Lwt.fail_with "Remove command failed"
+                else Lwt.return_unit)
+              (fun ex ->
+                Printf.eprintf
+                  "Error: while removing previous build-dir \
+                   %s:\n    %s\n%!"
+                  build_exos_dir (Printexc.to_string ex);
+                exit 1)
+          else
+            Lwt.return_unit
+        end >>= fun () ->
+        Printf.printf "Building %s\n%!" (o.build_dir / "exercises");
+        (* NOTE: we choose to reuse Lwt_utils.copy_tree,
+           even if we could use "rsync" (upside: "--delete-delay",
+           but downside: would require the availability of rsync). *)
+        Lwt.catch
+          (fun () -> Lwt_utils.copy_tree repo_exos_dir build_exos_dir)
+          (function
+           | Failure _ ->
+              Lwt.fail_with @@ Printf.sprintf
+                                 "Failed to copy repo exercises to %s"
+                                 (build_exos_dir)
+           | e -> Lwt.fail e)
+      (* NOTE: no chown is needed,
+         but we may want to run "chmod -R u+w exercises"
+         if the source repository has bad permissions... *)
+      end
+    else Lwt.return_unit
+  in
+  let generate ?(check_port = true) o =
     if List.mem Build o.commands then
-      (Printf.printf "Updating app at %s\n%!" o.app_dir;
+      (let get_app_dir o =
+         if not (List.mem Serve o.commands) then
+           Lwt.return o.app_dir
+         else if o.server.Server.replace || o.serve_during_build then
+           let temp_dir = temp_app_dir o in
+           (if Sys.file_exists temp_dir then
+             (Printf.eprintf "Warning: temporary directory %s already exists\n%!"
+                temp_dir;
+              Lwt.return_unit)
+            else if Sys.file_exists o.app_dir then
+              Lwt_utils.copy_tree o.app_dir temp_dir
+            else
+              Lwt.return_unit)
+           >>= fun () -> Lwt.return temp_dir
+         else if check_port && Learnocaml_server.check_running () <> None then
+           (* This server-specific check is here to fail earlier if need be *)
+           (Printf.eprintf
+              "Error: another server is already running on port %d \
+               (consider using option `--replace`)\n%!"
+              !Learnocaml_server.port;
+            exit 10)
+         else Lwt.return o.app_dir
+       in
+       get_app_dir o >>= fun app_dir ->
+       let o = { o with app_dir } in
+       Learnocaml_store.static_dir := app_dir;
+       Printf.printf "Updating app at %s\n%!" o.app_dir;
        Lwt.catch
          (fun () -> Lwt_utils.copy_tree o.builder.Builder.contents_dir o.app_dir)
          (function
@@ -362,13 +492,15 @@ let main o =
          (fun _ -> Learnocaml_process_playground_repository.main (o.app_dir))
        >>= fun playground_ret ->
        if_enabled o.builder.Builder.exercises (o.repo_dir/"exercises")
-         (fun _ -> Learnocaml_process_exercise_repository.main (o.app_dir))
+         (fun _ ->
+           copy_build_exercises o >>= fun () ->
+           Learnocaml_process_exercise_repository.main (o.app_dir))
        >>= fun exercises_ret ->
        Lwt_io.with_file ~mode:Lwt_io.Output (o.app_dir/"js"/"learnocaml-config.js")
          (fun oc ->
             Lwt_io.fprintf oc
               "var learnocaml_config = {\n\
-              \  enableTryocaml: %b,\n\
+              \  enableTutorials: %b,\n\
               \  enablePlayground: %b,\n\
               \  enableLessons: %b,\n\
               \  enableExercises: %b,\n\
@@ -389,8 +521,57 @@ let main o =
     else
       Lwt.return true
   in
-  let run_server () =
+  let kill_once pid =
+    let already = ref false in
+    fun () ->
+    if !already then () else
+      (already := true;
+       Unix.kill pid Sys.sigint;
+       Printf.eprintf "Waiting for child process %d to terminate... %!" pid;
+       ignore (Unix.waitpid [] pid);
+       prerr_endline "ok ")
+  in
+  (* child_pid = None => no --serve-during-build
+     child_pid = Some 0 => --serve-during-build, child process
+     child_pid = Some n, n>0 => --serve-during-build, main process *)
+  let run_server ~child_pid o =
     if List.mem Serve o.commands then
+      let () =
+        let int_child_pid = Option.value child_pid ~default:(-1) in
+        if o.server.Server.replace || (o.serve_during_build && int_child_pid > 0) then
+          let () =
+            (if int_child_pid > 0 then kill_once int_child_pid ()
+             else let running = Learnocaml_server.check_running () in
+                  Option.iter Learnocaml_server.kill_running running)
+          in
+          let temp = temp_app_dir o in
+          let app_dir = absolute_filename o.app_dir in
+          let bak =
+            let f =
+              Filename.temp_file
+                ~temp_dir:(Filename.dirname app_dir)
+                (Filename.basename app_dir ^ ".bak.")
+                ""
+            in
+            Unix.unlink f; f
+          in
+          if Sys.file_exists app_dir then Sys.rename app_dir bak;
+          Sys.rename temp o.app_dir;
+          Learnocaml_store.static_dir := app_dir;
+          if Sys.file_exists bak then
+            Lwt.dont_wait (fun () ->
+                Lwt.pause () >>= fun () ->
+                Lwt_process.exec ("rm",[|"rm";"-rf";bak|]) >>= fun r ->
+                if r <> Unix.WEXITED 0 then
+                  Lwt.fail_with "Remove command failed"
+                else Lwt.return_unit
+              )
+              (fun ex ->
+                 Printf.eprintf
+                   "Warning: while cleaning up older application \
+                    directory %s:\n    %s\n%!"
+                   bak (Printexc.to_string ex))
+      in
       let native_server = Sys.executable_name ^ "-server" in
       if Sys.file_exists native_server then
         let server_args =
@@ -399,38 +580,94 @@ let main o =
           ("--sync-dir="^o.server.sync_dir) ::
           ("--base-url="^o.builder.Builder.base_url) ::
           ("--port="^string_of_int o.server.port) ::
+          (match child_pid with None -> [] | Some n -> ["--child-pid="^string_of_int n])
+          @
           (match o.server.cert with None -> [] | Some c -> ["--cert="^c])
         in
-        Unix.execv native_server (Array.of_list (native_server::server_args))
+        Lwt.return
+          (`Continuation
+             (fun () ->
+                Unix.execv native_server
+                  (Array.of_list (native_server::server_args))))
       else begin
-          Printf.printf "Starting server on port %d\n%!"
-            !Learnocaml_server.port;
+          let comment = match child_pid with
+            | None -> ""
+            | Some 0 -> "(temporary)"
+            | Some _pid -> "(main)"
+          in
+          Printf.printf "Starting server%s on port %d\n%!"
+            comment !Learnocaml_server.port;
           if o.builder.Builder.base_url <> "" then
             Printf.printf "Base URL: %s\n%!" o.builder.Builder.base_url;
-          Learnocaml_server.launch ()
+          Learnocaml_server.launch () >>= fun ret ->
+          Lwt.return (`Success ret)
         end
     else
-      Lwt.return true
+      Lwt.return (`Success true)
   in
+  let lwt_run_server ~child_pid build_ok =
+    if build_ok then
+      run_server ~child_pid o >>= function
+      | `Success true -> Lwt.return (`Code 0)
+      | `Success false -> Lwt.return (`Code 10)
+      | `Continuation f -> Lwt.return (`Continuation f)
+    else
+      Lwt.return (`Code 1)
+  in
+  (* NOTE: the code below handles "learn-ocaml build serve --serve-during-build"
+     by relying on Lwt_unix.fork; and to stay on the safe side, we make sure
+     that this fork is triggered before the first Lwt_main.run command. *)
   let ret =
-    Lwt_main.run
-      (grade () >>= function
-        | Some i -> Lwt.return i
-        | None ->
-            generate () >>= fun success ->
-            if success then
-              run_server () >>= fun r ->
-              if r then Lwt.return 0 else Lwt.return 10
-            else
-              Lwt.return 1)
+    if o.serve_during_build then begin
+        if not (List.mem Build o.commands && List.mem Serve o.commands) then
+          (Printf.eprintf
+             "Error: option `--serve-during-build` requires both commands `build serve`.\n%!";
+           exit 1)
+        else if o.server.Server.replace then
+          (Printf.eprintf
+             "Error: option `--replace` is incompatible with option `--serve-during-build`.\n%!";
+           exit 10)
+        else if Learnocaml_server.check_running () <> None then
+          (Printf.eprintf
+             "Error: another server is already running on port %d \
+              (consider using option `--replace` instead of `--serve-during-build`)\n%!"
+             !Learnocaml_server.port;
+           exit 10);
+        match Lwt_unix.fork () with
+        | 0 ->
+           if Sys.file_exists o.app_dir then
+             Lwt_main.run (lwt_run_server ~child_pid:(Some 0) true)
+           else
+             (Printf.eprintf
+                "Info: no existing app-dir in '%s', \
+                 will be available at next run (skipping temporary server start).\n%!" o.app_dir;
+              `Code 0)
+        | child_pid ->
+           at_exit (kill_once child_pid);
+           Lwt_main.run
+             (grade o >>= function
+              | Some i -> Lwt.return (`Code i)
+              | None ->
+                 generate ~check_port:false o >>= lwt_run_server ~child_pid:(Some child_pid))
+      end
+    else
+      Lwt_main.run
+        (grade o >>= function
+         | Some i -> Lwt.return (`Code i)
+         | None ->
+            generate o >>= lwt_run_server ~child_pid:None)
   in
-  exit ret
+  match ret with
+  | `Code n -> exit n
+  | `Continuation f -> f ()
 
-let man = [
-  `S "DESCRIPTION";
+let man = 
+  let open Manpage in
+  [
+  `S s_description;
   `P "This program performs various tasks related to generating, serving and \
       administrating a learn-ocaml web-app.";
-  `S "COMMANDS";
+  `S s_commands;
   `P "The $(i,COMMAND) argument may be one or more of the following. If no \
       command is specified, '$(b,build) $(b,serve)' is assumed.";
   `I ("$(b,grade)", "Runs the automatic grader on exercise solutions.");
@@ -439,36 +676,48 @@ let man = [
                      $(b,REPOSITORY FORMAT)).");
   `I ("$(b,serve)", "Run a web-server providing access to the learn-ocaml app, \
                      as well as user file synchronisation.");
-  `S "OPTIONS";
+  `S s_common_options;
   `S "GRADER OPTIONS";
   `S "BUILDER OPTIONS";
   `S "SERVER OPTIONS";
   `S "REPOSITORY FORMAT";
   `P "The repository specified by $(b,--repo) is expected to contain \
       sub-directories $(b,lessons), $(b,tutorials), $(b,playground) and $(b,exercises).";
-  `S "AUTHORS";
+  `S s_exit_status;
+  `S s_environment;
+  `S s_authors;
   `P "The original authors are Benjamin Canou, \
-      Çağdaş Bozman, Grégoire Henry and Louis Gesbert. It is licensed under \
-      the MIT License.";
-  `S "BUGS";
+      Çağdaş Bozman, Grégoire Henry and Louis Gesbert (OCamlPro). \
+      Learn-OCaml is licensed under the MIT License.";
+  `S s_bugs;
   `P "Bugs should be reported to \
       $(i,https://github.com/ocaml-sf/learn-ocaml/issues)";
 ]
 
-let main_cmd =
-  Cmdliner.Term.(const main $ Args.term),
-  Cmdliner.Term.info
+let exits =
+  let open Cmd.Exit in
+  [ info ~doc:"Default exit." ok
+  ; info ~doc:"Client-side failure whose cause is printed on stderr. Caused by $(b,grade) or $(b,build) commands." 1
+  ; info ~doc:"Uncaught exception." 2
+  ; info ~doc:"Server error whose cause is printed on stderr. Caused by $(b,serve) command." 10
+  ]
+
+let main_info =
+  Cmd.info 
     ~man
+    ~exits
     ~doc:"Learn-ocaml web-app manager"
-    ~version:Learnocaml_api.version
+    ~version:Learnocaml_api.version 
     "learn-ocaml"
+
+let main_term = Term.(const main $ Args.term child_pid)
 
 let () =
   match
-    Cmdliner.Term.eval ~catch:false main_cmd
+    Cmd.eval_value ~catch:false (Cmd.v main_info main_term)
   with
   | exception Failure msg ->
       Printf.eprintf "[ERROR] %s\n" msg;
       exit 1
-  | `Error _ -> exit 2
+  | Error _ -> exit 2
   | _ -> exit 0

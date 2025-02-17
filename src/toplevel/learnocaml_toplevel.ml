@@ -1,11 +1,13 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
+open Js_of_ocaml_tyxml
+open Js_of_ocaml_lwt
 open Js_utils
 open Tyxml_js
 
@@ -21,18 +23,18 @@ let (>>=) = Lwt.(>>=)
 
 type t = {
   timeout_delay: float;
-  mutable timeout_prompt: t -> unit Lwt.t;
+  timeout_prompt: t -> unit Lwt.t;
   mutable current_timeout_prompt: unit Lwt.t;
   flood_limit: int;
-  mutable flood_prompt: t -> Html_types.nmtoken -> (unit -> int) -> bool Lwt.t;
+  flood_prompt: t -> Html_types.nmtoken -> (unit -> int) -> bool Lwt.t;
   mutable current_flood_prompt: unit Lwt.t;
   flood_reset: t -> unit;
   worker: Learnocaml_toplevel_worker_caller.t;
   container: [ `Div ] Html5.elt;
   oldify: bool;
   mutable status: [ `Reset of (unit Lwt.t * unit Lwt.u) | `Execute of unit Lwt.t | `Idle ] ;
-  mutable on_enable_input: t -> unit;
-  mutable on_disable_input: t -> unit;
+  on_enable_input: t -> unit;
+  on_disable_input: t -> unit;
   mutable disabled : int;
   output: Learnocaml_toplevel_output.output;
   input: Learnocaml_toplevel_input.input;
@@ -187,15 +189,20 @@ let execute_phrase top ?timeout content =
      reset_with_timeout top ~timeout ());
   ] >>= fun () ->
   t >>= fun result ->
-  let warnings, result = match result with
-    | Toploop_results.Ok (result, warnings) -> warnings, result
+  let error, warnings, result = match result with
+    | Toploop_results.Ok (result, warnings) ->
+        None, List.map Toploop_results.to_warning warnings, result
     | Toploop_results.Error (error, warnings) ->
-        Learnocaml_toplevel_output.output_error ~phrase top.output error ;
-        warnings, false in
+        Learnocaml_toplevel_output.output_error ~phrase top.output
+          (Toploop_results.to_error error) ;
+        Some (Toploop_results.to_error error),
+        List.map Toploop_results.to_warning warnings,
+        false
+  in
   List.iter
     (Learnocaml_toplevel_output.output_warning ~phrase top.output)
     warnings ;
-  Lwt.return result
+  Lwt.return (error, warnings, result)
 
 let execute top =
   Learnocaml_toplevel_input.execute top.input
@@ -242,15 +249,47 @@ let load top ?(print_outcome = true) ?timeout ?message content =
      reset top);
   ] >>= fun () ->
   t >>= fun result ->
-  let warnings, result = match result with
-    | Toploop_results.Ok (result, warnings) -> warnings, result
-    | Toploop_results.Error (error, warnings) ->
+  let warnings, result = match Toploop_results.to_report result with
+    | Ok (result, warnings) -> warnings, result
+    | Error (error, warnings) ->
         Learnocaml_toplevel_output.output_error top.output error ;
         warnings, false in
   List.iter
     (Learnocaml_toplevel_output.output_warning top.output)
     warnings ;
   Lwt.return result
+
+let load_js top ?(print_outcome = true) ?message content =
+  let phrase = Learnocaml_toplevel_output.phrase () in
+  protect_execution top @@ fun () ->
+  begin match message with
+    | None -> ()
+    | Some message ->
+        Learnocaml_toplevel_output.output_code ~phrase top.output
+          ("(* " ^ message ^ "*)")
+  end ;
+  let pp_answer =
+    if print_outcome then
+      Learnocaml_toplevel_output.output_answer ~phrase top.output
+    else
+      ignore in
+  Lwt.protected @@
+  Learnocaml_toplevel_worker_caller.use_compiled_string
+    top.worker ~pp_answer content
+  >>= fun result ->
+  let warnings, result = match Toploop_results.to_report result with
+    | Ok (result, warnings) -> warnings, result
+    | Error (error, warnings) ->
+        Learnocaml_toplevel_output.output_error top.output error ;
+        warnings, false in
+  List.iter
+    (Learnocaml_toplevel_output.output_warning top.output)
+    warnings ;
+  Lwt.return result
+
+let load_cmi_from_string top cmi =
+  protect_execution top @@ fun () ->
+  Learnocaml_toplevel_worker_caller.load_cmi_from_string top.worker cmi
 
 let make_timeout_popup
     ?(countdown = 10)
@@ -380,6 +419,22 @@ let wrap_flusher_to_prevent_flood top name hook real =
       flooded := total
     end
 
+let load_pp err top pps =
+  let prelude_pp =
+    Format.sprintf "open Learnocaml_toplevel_pp;; %s"
+      Learnocaml_toplevel_pp.prelude_pp
+  in
+  let rec loading = function
+    | [] -> Lwt.return_unit
+    | code :: cs ->
+      load ~print_outcome:false top code
+      >>= (fun _ -> loading cs)
+  in
+  let pps =
+    List.map (fun pp -> Format.sprintf "#install_printer %s;;" pp) pps
+  in
+  err >>= (fun _ -> loading (prelude_pp::pps))
+
 let welcome_phrase () =
   [%i"Printf.printf \"Welcome to OCaml %s\\n%!\" (Sys.ocaml_version);\n\
       print_endline \" - type your OCaml phrase in the box below and press [Enter]\";\n\
@@ -465,11 +520,12 @@ let create
       Lwt.catch
         (fun () -> execute_phrase top code)
         (function
-          | Lwt.Canceled -> Lwt.return true
-          | exn -> Lwt.fail exn )) ;
+          | Lwt.Canceled -> Lwt.return (None, [], true)
+          | exn -> Lwt.fail exn )
+      >>= fun _ -> Lwt.return_unit) ;
   let first_time = ref true in
   let after_init top =
-    if !first_time || not oldify then
+    if !first_time || not top.oldify then
       Learnocaml_toplevel_output.clear output
     else
       Learnocaml_toplevel_output.oldify output;
@@ -480,7 +536,7 @@ let create
       | `Idle | `Execute _ -> assert false
     end ;
     top.status <- `Idle;
-    begin if display_welcome && (!first_time || not oldify) then
+    begin if display_welcome && (!first_time || not top.oldify) then
         Learnocaml_toplevel_worker_caller.execute
           ~pp_answer: (fun _ -> ())
           ~print_outcome: false
@@ -495,10 +551,16 @@ let create
     else
       first_time := false ;
     Learnocaml_toplevel_worker_caller.register_callback worker "print_html"
-      (Learnocaml_toplevel_output.output_html output) >>= fun _ ->
+      (Learnocaml_toplevel_output.output_html output)
+    >>= fun _ ->
+      Learnocaml_toplevel_worker_caller.register_callback worker "print_svg"
+        (Learnocaml_toplevel_output.output_svg output)
+    >>= fun err -> load_pp (Lwt.return err) top Learnocaml_toplevel_pp.pp_list
+    >>= fun _ ->
     match after_init with
     | None -> Lwt.return_unit
-    | Some f -> f top in
+    | Some f -> f top
+  in
   after_init top >>= fun () ->
   Learnocaml_toplevel_worker_caller.set_after_init top.worker (fun _ -> after_init top);
   Lwt.return top

@@ -1,3 +1,3 @@
-(lang dune 1.7)
+(lang dune 3.6)
 (name learn-ocaml)
-(version 0.12)
+(version 1.1.0)

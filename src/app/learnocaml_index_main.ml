@@ -1,17 +1,20 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
 open Js_of_ocaml
+open Js_of_ocaml_tyxml
+open Js_of_ocaml_lwt
 open Js_utils
 open Lwt
 open Learnocaml_data
 open Learnocaml_common
 open Learnocaml_config
+open Token_Index
 
 module H = Tyxml_js.Html5
 
@@ -72,11 +75,19 @@ module El = struct
   module Dyn = struct
     (** Elements that are dynamically created (ids only) *)
     let exercise_list_id = "learnocaml-main-exercise-list"
-    let tryocaml_id = "learnocaml-main-tryocaml"
+    let exercise_bar = "learnocaml-main-exercise-bar"
+    let exercise_pane = "learnocaml-main-exercise-pane"
+    let filter_box = "learnocaml-filter-box"
+    let tutorial_id = "learnocaml-main-tutorial"
     let lesson_id = "learnocaml-main-lesson"
     let toplevel_id = "learnocaml-main-toplevel"
   end
 end
+
+type tab_handler =
+  (?clear_cache:bool -> unit -> unit Lwt.t) ->
+  (string -> string) * (string -> string -> unit) * (string -> unit) ->
+  unit -> Html_types.div H.elt t
 
 let show_loading msg = show_loading ~id:El.loading_id H.[ul [li [txt msg]]]
 
@@ -85,95 +96,244 @@ let get_url token dynamic_url static_url id =
   | Some _ -> dynamic_url ^ Url.urlencode id ^ "/"
   | None -> api_server ^ "/" ^ static_url ^ Url.urlencode id
 
-let exercises_tab token _ _ () =
-  show_loading [%i"Loading exercises"] @@ fun () ->
-  Lwt_js.sleep 0.5 >>= fun () ->
-  retrieve (Learnocaml_api.Exercise_index token)
-  >>= fun (index, deadlines) ->
-  let format_exercise_list all_exercise_states =
-    let rec format_contents lvl acc contents =
-      let open Tyxml_js.Html5 in
-      match contents with
-      | Exercise.Index.Exercises exercises ->
-          List.fold_left
-            (fun acc (exercise_id, meta_opt) ->
-              match meta_opt with None -> acc | Some meta ->
-              let {Exercise.Meta.kind; title; short_description; stars; _ } =
-                meta
-              in
-              let pct_init =
-                match SMap.find exercise_id all_exercise_states with
-                | exception Not_found -> None
-                | { Answer.grade ; _ } -> grade in
-              let pct_signal, pct_signal_set = React.S.create pct_init in
-              Learnocaml_local_storage.(listener (exercise_state exercise_id)) :=
-                Some (function
-                    | Some { Answer.grade ; _ } -> pct_signal_set grade
-                    | None -> pct_signal_set None) ;
-              let pct_text_signal =
-                React.S.map
-                  (function
-                    | None -> "--"
-                    | Some 0 -> "0%"
-                    | Some pct -> string_of_int pct ^ "%")
-                  pct_signal in
-              let time_left = match List.assoc_opt exercise_id deadlines with
-                | None -> ""
-                | Some 0. -> [%i"Exercise closed"]
-                | Some f -> Printf.sprintf [%if"Time left: %s"]
-                              (string_of_seconds (int_of_float f))
-              in
-              let status_classes_signal =
-                React.S.map
-                  (function
-                    | None -> [ "stats" ]
-                    | Some 0 -> [ "stats" ; "failure" ]
-                    | Some pct when  pct >= 100 -> [ "stats" ; "success" ]
-                    | Some _ -> [ "stats" ; "partial" ])
-                  pct_signal in
-              a ~a:[ a_href (get_url token "/exercises/" "exercise.html#id=" exercise_id) ;
-                     a_class [ "exercise" ] ] [
-                div ~a:[ a_class [ "descr" ] ] (
-                  h1 [ txt title ] ::
-                  begin match short_description with
-                    | None -> []
-                    | Some text -> [ txt text ]
-                  end
-                );
-                div ~a:[ a_class [ "time-left" ] ] [H.txt time_left];
-                div ~a:[ Tyxml_js.R.Html5.a_class status_classes_signal ] [
-                  stars_div stars;
-                  div ~a:[ a_class [ "length" ] ] [
-                    match kind with
-                    | Exercise.Meta.Project -> txt [%i"project"]
-                    | Exercise.Meta.Problem -> txt [%i"problem"]
-                    | Exercise.Meta.Exercise -> txt [%i"exercise"] ] ;
-                  div ~a:[ a_class [ "score" ] ] [
-                    Tyxml_js.R.Html5.txt pct_text_signal
-                  ]
-                ] ] ::
-              acc)
-            acc exercises
-      | Exercise.Index.Groups groups ->
-          let h = match lvl with 1 -> h1 | 2 -> h2 | _ -> h3 in
-          List.fold_left
-            (fun acc (_, Exercise.Index.{ title ; contents }) ->
-               format_contents (succ lvl)
-                 (h ~a:[ a_class [ "pack" ] ] [ txt title ] :: acc)
-                 contents)
-            acc groups in
-    List.rev (format_contents 1 [] index) in
-  let list_div =
-    match format_exercise_list
-            Learnocaml_local_storage.(retrieve all_exercise_states)
-    with
-    | [] -> H.div [H.txt [%i"No open exercises at the moment"]]
-    | l -> H.div ~a:[H.a_id El.Dyn.exercise_list_id] l
-  in
-    Manip.appendChild El.content list_div;
-    Lwt.return list_div
+type exercise_ordering = By_category | By_skill | By_difficulty
 
-let playground_tab token _ _ () =
+let (exercise_filter_signal: string option React.signal), set_exercise_filter =
+  React.S.create None
+
+let (exercise_sort_signal: exercise_ordering React.signal), set_exercise_sort =
+  React.S.create By_category
+
+let make_exercises_to_display_signal index =
+  let get_index exo_sort exo_filter =
+    let index =
+      match exo_sort with
+      | By_category -> index
+      | By_skill ->
+          let module StrMap = Map.Make(struct
+              type t = string
+              (* Case-insensitive ordering *)
+              let compare a b =
+                String.(compare (lowercase_ascii a) (lowercase_ascii b))
+            end)
+          in
+          let by_skill =
+            Exercise.Index.fold_exercises (fun map id meta ->
+                List.fold_left (fun acc skill ->
+                    StrMap.update skill
+                      (function None -> Some [id, Some meta]
+                              | Some l -> Some ((id, Some meta) :: l))
+                      acc)
+                  map
+                  meta.Exercise.Meta.focus)
+              StrMap.empty index
+          in
+          let groups =
+            StrMap.fold (fun skill exercises acc ->
+                (skill,
+                 {Exercise.Index.title = skill;
+                  contents = Exercise.Index.Exercises (List.rev exercises)})
+                :: acc)
+              by_skill []
+          in
+          Exercise.Index.Groups (List.rev groups)
+      | By_difficulty ->
+          let module IntMap = Map.Make(Int) in
+          let starmap =
+            Exercise.Index.fold_exercises (fun map id meta ->
+                IntMap.update
+                  (int_of_float (Float.ceil meta.Exercise.Meta.stars))
+                  (function None -> Some [id, Some meta]
+                          | Some l -> Some ((id, Some meta) :: l))
+                  map)
+              IntMap.empty index
+          in
+          let groups =
+            IntMap.fold (fun stars exercises acc ->
+                let title =
+                  if stars = 1 then [%i"1 star"]
+                  else Printf.sprintf [%if"%d stars"] stars
+                in
+                (title,
+                 {Exercise.Index.title;
+                  contents = Exercise.Index.Exercises (List.rev exercises)})
+                :: acc)
+              starmap []
+          in
+          Exercise.Index.Groups (List.rev groups)
+    in
+    let index =
+      match exo_filter with
+      | None -> index
+      | Some filt_str ->
+          Exercise.Index.filter (fun _ meta ->
+              let re = Re.(compile (no_case (str filt_str))) in
+              List.exists (Re.execp re)
+                (meta.Exercise.Meta.title ::
+                 Option.to_list meta.Exercise.Meta.short_description @
+                 List.map fst meta.Exercise.Meta.author @
+                 List.map snd meta.Exercise.Meta.author @
+                 meta.Exercise.Meta.focus @
+                 meta.Exercise.Meta.requirements))
+            index
+    in
+    if index = Exercise.Index.Exercises [] then
+      Exercise.Index.Groups
+        ["empty_group",
+         { Exercise.Index.title = [%i"No exercises found"];
+           Exercise.Index.contents = Exercise.Index.Exercises []; }]
+    else index
+  in
+  React.S.l2 get_index exercise_sort_signal exercise_filter_signal
+
+let retain_signals = ref (React.S.const ())
+(* Used to register signals as GC roots *)
+
+let exercises_tab token : tab_handler =
+  fun _ _ () ->
+    let open Tyxml_js.Html5 in
+    show_loading  [%i"Loading exercises"] @@ fun () ->
+    Lwt_js.sleep 0.5 >>= fun () ->
+    retrieve (Learnocaml_api.Exercise_index token)
+    >>= fun (index, deadlines) ->
+    let exercises_to_display_signal =
+      make_exercises_to_display_signal index
+    in
+    let all_exercise_states =
+      Learnocaml_local_storage.(retrieve all_exercise_states)
+    in
+    let format_exercise exercise_id {Exercise.Meta.kind; title; short_description; stars; _ } =
+      let pct_init =
+        match SMap.find exercise_id all_exercise_states with
+        | exception Not_found -> None
+        | { Answer.grade ; _ } -> grade in
+      let pct_signal, pct_signal_set = React.S.create pct_init in
+      Learnocaml_local_storage.(listener (exercise_state exercise_id)) :=
+        Some (function
+            | Some { Answer.grade ; _ } -> pct_signal_set grade
+            | None -> pct_signal_set None) ;
+      let pct_text_signal =
+        React.S.map
+          (function
+            | None -> "--"
+            | Some 0 -> "0%"
+            | Some pct -> string_of_int pct ^ "%")
+          pct_signal in
+      let time_left = match List.assoc_opt exercise_id deadlines with
+        | None -> ""
+        | Some 0. -> [%i"Exercise closed"]
+        | Some f -> Printf.sprintf [%if"Time left: %s"]
+                      (string_of_seconds (int_of_float f))
+      in
+      let status_classes_signal =
+        React.S.map
+          (function
+            | None -> [ "stats" ]
+            | Some 0 -> [ "stats" ; "failure" ]
+            | Some pct when  pct >= 100 -> [ "stats" ; "success" ]
+            | Some _ -> [ "stats" ; "partial" ])
+          pct_signal in
+      a ~a:[ a_href (get_url token "/exercises/" "exercise.html#id=" exercise_id) ;
+             a_class [ "exercise" ] ] [
+        div ~a:[ a_class [ "descr" ] ] (
+          h1 [ txt title ] ::
+          begin match short_description with
+            | None -> []
+            | Some text -> [ txt text ]
+          end
+        );
+        div ~a:[ a_class [ "time-left" ] ] [H.txt time_left];
+        div ~a:[ Tyxml_js.R.Html5.a_class status_classes_signal ] [
+          stars_div stars;
+          div ~a:[ a_class [ "length" ] ] [
+            match kind with
+            | Exercise.Meta.Project -> txt [%i"project"]
+            | Exercise.Meta.Problem -> txt [%i"problem"]
+            | Exercise.Meta.Exercise -> txt [%i"exercise"] ] ;
+          div ~a:[ a_class [ "score" ] ] [
+            Tyxml_js.R.Html5.txt pct_text_signal
+          ]
+        ] ]
+    in
+    let rec format_exercise_list index =
+      match index with
+      | Exercise.Index.Exercises el ->
+          H.ul @@
+          List.map
+            (fun (id, meta) -> H.li [format_exercise id (Option.get meta)])
+            el
+      | Exercise.Index.Groups gl ->
+          H.ul @@
+          List.map (fun (id, grp) ->
+              let clas =
+                "group-title" ::
+                match gl with [] | [_] -> [] | _ -> ["collapsed"]
+              in
+              let title =
+                H.div ~a:[a_id id; a_class clas]
+                  [H.txt grp.Exercise.Index.title];
+              in
+              let exos = format_exercise_list grp.Exercise.Index.contents in
+              Manip.Ev.onclick title
+                (fun _ ->
+                   ignore (Manip.toggleClass title "collapsed");
+                   false);
+              H.li [title; exos])
+            gl
+    in
+    let exercise_list_signal =
+      React.S.l1 format_exercise_list exercises_to_display_signal
+    in
+    let btns_sigs =
+      List.map (fun (id, sort, name) ->
+          let btn = button ~a:[a_id id] [ txt name ] in
+          Manip.Ev.onclick btn
+            (fun _ -> set_exercise_sort sort; true);
+          let signal =
+            React.S.map (fun s ->
+                (if sort = s then Manip.addClass else Manip.removeClass)
+                  btn "active"
+              ) exercise_sort_signal
+          in
+          btn, signal)
+        [
+          "by_category", By_category, [%i"By category"];
+          "by_skill", By_skill, [%i"By skill"];
+          "by_difficulty", By_difficulty, [%i"By difficulty"];
+        ]
+    in
+    let btns, btns_sigs = List.split btns_sigs in
+    let btns =
+      btns @
+      [
+        let input_field =
+          H.input ~a:[H.a_input_type `Search] ()
+        in
+        Manip.Ev.oninput input_field (fun _ev ->
+            set_exercise_filter (Some (Manip.value input_field));
+            true);
+        H.div ~a:[H.a_class ["filter-box"]] [input_field];
+      ]
+    in
+    let exercise_list_html =
+      H.div ~a:[H.a_id El.Dyn.exercise_list_id] btns
+    in
+    let pane_div =
+      H.div ~a:[H.a_id El.Dyn.exercise_pane]
+        [H.div ~a:[H.a_id El.Dyn.exercise_bar] btns; exercise_list_html]
+    in
+    Manip.removeChildren El.content;
+    Manip.appendChild El.content pane_div;
+    let list_update_signal =
+      React.S.map (fun l -> Manip.replaceChildren exercise_list_html [l])
+        exercise_list_signal
+    in
+    retain_signals :=
+      React.S.merge (fun () () -> ()) () (list_update_signal :: btns_sigs);
+    Lwt.return pane_div
+
+let playground_tab token : tab_handler =
+  fun _ _ () ->
   show_loading [%i"Loading playground"] @@ fun () ->
   Lwt_js.sleep 0.5 >>= fun () ->
   retrieve (Learnocaml_api.Playground_index ())
@@ -199,7 +359,8 @@ let playground_tab token _ _ () =
   Manip.appendChild El.content list_div;
   Lwt.return list_div
 
-let lessons_tab select (arg, set_arg, _delete_arg) () =
+let lessons_tab : tab_handler =
+  fun select (arg, set_arg, _delete_arg) () ->
   show_loading [%i"Loading lessons"] @@ fun () ->
   Lwt_js.sleep 0.5 >>= fun () ->
   retrieve (Learnocaml_api.Lesson_index ()) >>= fun index ->
@@ -317,7 +478,8 @@ let lessons_tab select (arg, set_arg, _delete_arg) () =
   end >>= fun () ->
   Lwt.return lesson_div
 
-let tryocaml_tab select (arg, set_arg, _delete_arg) () =
+let tutorial_tab : tab_handler =
+  fun select (arg, set_arg, _delete_arg) () ->
   let open Tutorial in
   let navigation_div =
     Tyxml_js.Html5.(div ~a: [ a_class [ "navigation" ] ] []) in
@@ -336,7 +498,7 @@ let tryocaml_tab select (arg, set_arg, _delete_arg) () =
   let buttons_div =
     Tyxml_js.Html5.(div ~a: [ a_class [ "buttons" ] ] []) in
   let tutorial_div =
-    Tyxml_js.Html5.(div ~a: [ a_id El.Dyn.tryocaml_id ])
+    Tyxml_js.Html5.(div ~a: [ a_id El.Dyn.tutorial_id ])
       [ navigation_div ; step_div ; toplevel_div ; buttons_div ] in
   let toplevel_buttons_group = button_group () in
   disable_button_group toplevel_buttons_group (* enabled after init *) ;
@@ -345,7 +507,7 @@ let tryocaml_tab select (arg, set_arg, _delete_arg) () =
     let on_enable () = Manip.removeClass step_div "disabled" in
     toplevel_launch ~on_disable ~on_enable toplevel_div
       Learnocaml_local_storage.toplevel_history
-      (fun () -> Lwt.async select) toplevel_buttons_group "tryocaml"
+      (fun () -> Lwt.async select) toplevel_buttons_group "tutorials"
   in
   show_loading [%i"Loading tutorials"] @@ fun () ->
   Lwt_js.sleep 0.5 >>= fun () ->
@@ -501,11 +663,12 @@ let tryocaml_tab select (arg, set_arg, _delete_arg) () =
   load_tutorial !current_tutorial_name !current_step_id () >>= fun () ->
   toplevel_launch >>= fun top ->
   let toplevel_button =
-    button ~container: buttons_div ~theme: "dark" ~group:toplevel_buttons_group ?state:None in
+    button ?id:None ~container: buttons_div ~theme: "dark" ~group:toplevel_buttons_group ?state:None in
   init_toplevel_pane toplevel_launch top toplevel_buttons_group toplevel_button ;
   Lwt.return tutorial_div
 
-let toplevel_tab select _ () =
+let toplevel_tab : tab_handler =
+  fun select _ () ->
   let container =
     Tyxml_js.Html5.(div ~a: [ a_class [ "toplevel-pane" ] ]) [] in
   let buttons_div =
@@ -521,11 +684,12 @@ let toplevel_tab select _ () =
     (fun _ -> Lwt.async select) toplevel_buttons_group "toplevel"
   >>= fun top ->
   Manip.appendChild El.content div ;
-  let button = button ~container: buttons_div ~theme: "dark" ?group:None ?state:None in
+  let button = button ?id:None ~container: buttons_div ~theme: "dark" ?group:None ?state:None in
   init_toplevel_pane (Lwt.return top) top toplevel_buttons_group button ;
   Lwt.return div
 
-let teacher_tab token a b () =
+let teacher_tab token : tab_handler =
+  fun a b () ->
   show_loading [%i"Loading student info"] @@ fun () ->
   Learnocaml_teacher_tab.teacher_tab token a b () >>= fun div ->
   Lwt.return div
@@ -686,11 +850,13 @@ let init_token_dialog () =
          retrieve
            (Learnocaml_api.Create_token (secret, None, Some nickname))
          >>= fun token ->
-         Learnocaml_local_storage.(store sync_token) token;
+         NonceIndex.create_entry token;
+         let nonce = NonceIndex.from_token token in
+         Learnocaml_local_storage.(store sync_token) nonce;
          Learnocaml_local_storage.(store can_show_token) true;
-         show_token_dialog token
+         show_token_dialog nonce
          >>= fun () ->
-         Lwt.return_some (token, nickname))
+         Lwt.return_some (nonce, nickname))
     else
       Lwt.return_none
   in
@@ -772,9 +938,11 @@ let init_token_dialog () =
       | Ok token ->
          Server_caller.request (Learnocaml_api.Fetch_save token) >>= function
          | Ok save ->
-            set_state_from_save_file ~token save;
+            NonceIndex.create_entry token;
+            let nonce = NonceIndex.from_token token in
+            set_state_from_save_file ~token:nonce save;
             Learnocaml_local_storage.(store can_show_token) false;
-            Lwt.return_some (token, save.Save.nickname)
+            Lwt.return_some (nonce, save.Save.nickname)
          | Error (`Not_found _) ->
             alert ~title:[%i"TOKEN NOT FOUND"]
               [%i"The entered token couldn't be recognized."];
@@ -809,9 +977,11 @@ let init_token_dialog () =
        | _ ->
           Server_caller.request (Learnocaml_api.Fetch_save token) >>= function
           | Ok save ->
-             set_state_from_save_file ~token save;
+             NonceIndex.create_entry token;
+             let nonce = NonceIndex.from_token token in
+             set_state_from_save_file ~token:nonce save;
              Learnocaml_local_storage.(store can_show_token) true;
-             Lwt.return_some (token, save.Save.nickname)
+             Lwt.return_some (nonce, save.Save.nickname)
           | Error (`Not_found _) ->
              alert ~title:[%i"TOKEN NOT FOUND"]
                [%i"The entered token couldn't be recognized."];
@@ -962,7 +1132,9 @@ let set_string_translations () =
   List.iter
     (fun (el, text) ->
        (Tyxml_js.To_dom.of_input el)##.placeholder := Js.string text)
-    placeholder_translations
+    placeholder_translations;
+  Manip.SetHTMLElement.title (find_component "learnocaml-main-feedback")
+    [%i"Send feedback to Learn-OCaml developers"]
 
 let () =
   Lwt.async_exception_hook := begin fun e ->
@@ -981,8 +1153,8 @@ let () =
   Lwt.async @@ fun () ->
   set_string_translations ();
   Dom_html.document##.title :=
-    Js.string ("Learn OCaml" ^ " v."^Learnocaml_api.version);
-  Manip.setInnerText El.version ("v."^Learnocaml_api.version);
+    Js.string ("Learn OCaml" ^ " v"^Learnocaml_api.version);
+  Manip.setInnerText El.version ("v"^Learnocaml_api.version);
   Learnocaml_local_storage.init () ;
   let sync_button_group = button_group () in
   disable_button_group sync_button_group;
@@ -1036,28 +1208,30 @@ let () =
            let buttons =
              match emails with
              | Some (cur_email, Some new_email) when cur_email <> new_email ->
-                [[%i"Change password"], change_password;
-                 [%i"Abort e-mail change"], abort_email_change]
+                [[%i"Change password"], (fun () -> change_password () >>= fun _ -> Lwt.return_unit);
+                 [%i"Abort e-mail change"], (fun () -> abort_email_change () >>= fun _ -> Lwt.return_unit)]
              | Some (_email, Some _) ->
-                [[%i"Change password"], change_password]
+                [[%i"Change password"], (fun () -> change_password () >>= fun _ -> Lwt.return_unit)]
              | Some (_email, None) ->
-                [[%i"Change password"], change_password;
-                 [%i"Change e-mail"], change_email]
-             | None -> (* Upgrade is not critical as the user logged-in by LTI *)
-                show_upgrade_button ~critical:false (); [] in
+                [[%i"Change password"], (fun () -> change_password () >>= fun _ -> Lwt.return_unit);
+                 [%i"Change e-mail"], (fun () -> change_email () >>= fun _ -> Lwt.return_unit)]
+             | None ->
+                show_upgrade_button ~critical:false ();
+                [] in
            let container = El.op_buttons_container in
            Manip.removeChildren container;
            List.iter (fun (name, callback) ->
                let btn = Tyxml_js.Html5.(button [txt name]) in
-               Manip.Ev.onclick btn (fun _ -> Lwt.async callback; true);
+               Manip.Ev.onclick btn (fun _ -> Lwt.async (fun () -> callback ()); true);
                Manip.appendChild container btn) buttons;
            Lwt.return_unit
     else Lwt.return_unit
   in
   let init_tabs token =
-    let tabs =
-      (if get_opt config##.enableTryocaml
-       then [ "tryocaml", ([%i"Try OCaml"], tryocaml_tab) ] else []) @
+    let get_opt o = Js.Optdef.get o (fun () -> false) in
+    let tabs : (string * (string * tab_handler)) list =
+      (if get_opt config##.enableTutorials
+       then [ "tutorials", ([%i"Tutorials"], tutorial_tab) ] else []) @
       (if get_opt config##.enableLessons
        then [ "lessons", ([%i"Lessons"], lessons_tab) ] else []) @
         (if get_opt config##.enableExercises then
@@ -1082,7 +1256,7 @@ let () =
          let btn = Tyxml_js.Html5.(button [ txt name]) in
          let div = ref None in
          let args = ref [] in
-         let rec select () =
+         let rec select ?(clear_cache=false) () =
            let th () =
              Lwt.pause () >>= fun () ->
              begin match !current_btn with
@@ -1090,13 +1264,15 @@ let () =
                | Some btn -> Manip.removeClass btn "active"
              end ;
              Manip.removeChildren El.content ;
-             List.iter (fun (n, _) -> delete_arg n) !(!current_args) ;
+             List.iter (fun (n, _) ->
+              if n <> "display" then delete_arg n)
+              !(!current_args);
              begin match !div with
-               | Some div ->
+                | Some div when not clear_cache ->
                    List.iter (fun (n, v) -> set_arg n v) !args ;
                    Manip.appendChild El.content div ;
                    Lwt.return_unit
-               | None ->
+                | _ ->
                    let arg name =
                      arg name in
                    let set_arg name value =
@@ -1187,11 +1363,12 @@ let () =
     confirm ~title:[%i"Logout"] ~ok_label:[%i"Logout"]
       dialog_content
       (fun () ->
-         Lwt.async @@ fun () ->
+        Lwt.async @@ fun () ->
+         let nonce = Learnocaml_local_storage.(retrieve sync_token) in
          Learnocaml_local_storage.clear ();
          delete_cookie "token";
          reload ();
-         Lwt.return_unit)
+         NonceIndex.delete_entry @@ NonceIndex.from_nonce nonce)
   in
   List.iter (fun (text, icon, f) ->
       button ~container:El.sync_buttons ~theme:"white" ~group:sync_button_group ~icon text f)
@@ -1202,7 +1379,7 @@ let () =
           show_token_dialog (get_stored_token ()));
       [%i"Sync workspace"], "sync", (fun () ->
           catch_with_alert @@ fun () ->
-          sync () >>= fun _ -> Lwt.return_unit);
+          sync () ignore >>= fun _ -> Lwt.return_unit);
       [%i"Export to file"], "download", download_save;
       [%i"Import"], "upload", import_save;
       [%i"Download all source files"], "download", download_all;
