@@ -45,7 +45,6 @@ depends: [
   "ppx_inline_test"
   "ppx_fields_conv"
   "ppx_sexp_conv"
-  "ppx_tools"
   "safepass"
   "ssl" {>= "0.5.12"}
   "vg"

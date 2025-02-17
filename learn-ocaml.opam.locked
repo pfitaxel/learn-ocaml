@@ -49,8 +49,10 @@ depends: [
   "conf-gmp-powm-sec" {= "3"}
   "conf-libssl" {= "4"}
   "conf-pkg-config" {= "3"}
+  "conf-zlib" {= "1"}
   "cppo" {= "1.6.8"}
   "crunch" {= "3.3.1"}
+  "cryptokit" {= "1.16.1"}
   "csexp" {= "1.5.1"}
   "cstruct" {= "6.2.0"}
   "decompress" {= "0.8.1"}
@@ -137,6 +139,7 @@ depends: [
   "reactiveData" {= "0.3.0"}
   "result" {= "1.5"}
   "rresult" {= "0.7.0"}
+  "safepass" {= "3.1"}
   "sedlex" {= "3.2"}
   "seq" {= "base"}
   "sexplib" {= "v0.16.0"}
@@ -160,7 +163,6 @@ depends: [
 build: [
   [make "static"]
   ["dune" "build" "-p" name "-j" jobs]
-  [make "detect-libs"] {with-test}
 ]
 install: [
   ["mkdir" "-p" "%{_:share}%"]
