@@ -148,6 +148,7 @@
 	    str)
  (modules Learnocaml_lti_main)
  (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
  (js_of_ocaml
   (flags :standard +cstruct/cstruct.js)
   (javascript_files ../ace-lib/ace_bindings.js))
@@ -163,6 +164,7 @@
             ocplib_i18n)
  (modules Learnocaml_reset_main)
  (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
  (js_of_ocaml
   (flags :standard +cstruct/cstruct.js)
   (javascript_files ../ace-lib/ace_bindings.js))
@@ -179,6 +181,7 @@
 	    uri)
  (modules Learnocaml_upgrade_main)
  (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
  (js_of_ocaml
   (flags :standard +cstruct/cstruct.js)
   (javascript_files ../ace-lib/ace_bindings.js))
@@ -195,6 +198,7 @@
 	    js_of_ocaml-tyxml)
  (modules Learnocaml_redirection_main)
  (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
  (js_of_ocaml
   (flags :standard +cstruct/cstruct.js)
   (javascript_files ../ace-lib/ace_bindings.js))
@@ -211,6 +215,7 @@
 	    uri)
  (modules Learnocaml_validate_main)
  (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
  (js_of_ocaml
   (flags :standard +cstruct/cstruct.js)
   (javascript_files ../ace-lib/ace_bindings.js))
