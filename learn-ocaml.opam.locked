@@ -35,6 +35,7 @@ depends: [
   "base64" {= "3.5.0"}
   "bheap" {= "2.0.0"}
   "bigarray-compat" {= "1.1.0"}
+  "bigarray-overlap" {= "0.2.1"}
   "bigstringaf" {= "0.9.0"}
   "bos" {= "0.2.1"}
   "ca-certs" {= "1.0.0"}
@@ -50,6 +51,8 @@ depends: [
   "cohttp" {= "5.0.0"}
   "cohttp-lwt" {= "5.0.0"}
   "cohttp-lwt-unix" {= "5.0.0"}
+  "coin" {= "0.1.4"}
+  "colombe" {= "0.11.0"}
   "conduit" {= "7.0.0"}
   "conduit-lwt" {= "7.0.0"}
   "conduit-lwt-unix" {= "7.0.0"}
@@ -61,6 +64,7 @@ depends: [
   "conf-libssl" {= "4"}
   "conf-pkg-config" {= "3"}
   "conf-zlib" {= "1"}
+  "containers" {= "3.15"}
   "cppo" {= "1.6.8"}
   "crunch" {= "3.3.1"}
   "cryptokit" {= "1.16.1"}
@@ -127,6 +131,7 @@ depends: [
   "jst-config" {= "v0.16.0"}
   "kdf" {= "1.0.0"}
   "ke" {= "0.6"}
+  "letters" {= "0.4.0"}
   "logs" {= "0.7.0"}
   "lru" {= "0.3.1"}
   "lwt" {= "5.7.0"}
@@ -156,9 +161,11 @@ depends: [
   "mirage-flow" {= "4.0.0"}
   "mirage-kv" {= "6.0.1"}
   "mirage-net" {= "4.0.0"}
+  "mirage-ptime" {= "5.0.0"}
   "mirage-runtime" {= "4.5.0"}
   "mirage-time" {= "2.0.1"}
   "mirage-unix" {= "5.0.1"}
+  "mrmime" {= "0.6.1"}
   "mtime" {= "2.1.0"}
   "num" {= "1.4"}
   "ocaml" {= "5.1.1"}
@@ -179,7 +186,7 @@ depends: [
   "optint" {= "0.2.0"}
   "paf" {= "0.7.0"}
   "parsexp" {= "v0.16.0"}
-  "pecu" {= "0.5"}
+  "pecu" {= "0.7"}
   "pprint" {= "20220103"}
   "ppx_assert" {= "v0.16.0"}
   "ppx_base" {= "v0.16.0"}
@@ -199,6 +206,7 @@ depends: [
   "ppx_repr" {= "0.7.0"}
   "ppx_sexp_conv" {= "v0.16.0"}
   "ppxlib" {= "0.32.1"}
+  "prettym" {= "0.0.3"}
   "psq" {= "0.2.1"}
   "ptime" {= "1.1.0"}
   "randomconv" {= "0.2.0"}
@@ -207,9 +215,11 @@ depends: [
   "reactiveData" {= "0.3.0"}
   "repr" {= "0.7.0"}
   "result" {= "1.5"}
+  "rosetta" {= "0.3.0"}
   "rresult" {= "0.7.0"}
   "safepass" {= "3.1"}
   "sedlex" {= "3.2"}
+  "sendmail" {= "0.11.0"}
   "seq" {= "base"}
   "sexplib" {= "v0.16.0"}
   "sexplib0" {= "v0.16.0"}
@@ -219,17 +229,21 @@ depends: [
   "stringext" {= "1.6.0"}
   "tcpip" {= "8.2.0"}
   "time_now" {= "v0.16.0"}
-  "tls" {= "1.0.2"}
-  "tls-mirage" {= "1.0.2"}
+  "tls" {= "2.0.0"}
+  "tls-lwt" {= "2.0.0"}
+  "tls-mirage" {= "2.0.0"}
   "topkg" {= "1.0.7"}
   "tyxml" {= "4.6.0"}
   "uchar" {= "0.0.2"}
+  "unstrctrd" {= "0.4"}
   "uri" {= "4.2.0"}
   "uri-sexp" {= "4.2.0"}
   "uutf" {= "1.0.3"}
+  "uuuu" {= "0.3.0"}
   "vg" {= "0.9.4"}
   "x509" {= "1.0.4"}
   "yojson" {= "2.2.2"}
+  "yuscii" {= "0.3.0"}
   "zarith" {= "1.13"}
 ]
 build: [
@@ -247,3 +261,7 @@ the common files. A demo exercise repository is also provided as example.
 """
 run-test: [make "test"]
 depexts: ["lsof"] {os-distribution = "alpine"}
+pin-depends: [
+  "irmin-git.3.10.0"
+  "https://github.com/mirage/irmin/releases/download/3.10.0/irmin-3.10.0.tbz"
+]

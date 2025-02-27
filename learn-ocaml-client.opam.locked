@@ -132,6 +132,8 @@ depends: [
   "stdlib-shims" {= "0.3.0"}
   "stringext" {= "1.6.0"}
   "time_now" {= "v0.16.0"}
+  "tls" {= "2.0.0"}
+  "tls-lwt" {= "2.0.0"}
   "topkg" {= "1.0.7"}
   "uchar" {= "0.0.2"}
   "uri" {= "4.2.0"}
