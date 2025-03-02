@@ -6,12 +6,12 @@
 )
 
 (executable
- (package learn-ocaml)
- (public_name learn-ocaml)
+;; (package learn-ocaml) ;; missing support in dune, manually installed below
+;; (public_name learn-ocaml)
  (name learnocaml_main)
- (modes byte)
- (ocamlc_flags :standard -custom)
- (flags :standard -linkall)
+ (modes byte_complete)
+ (ocamlc_flags -custom)
+ (flags :standard -linkall -verbose (:include linking_main.sexp))
  (modules Learnocaml_main)
  (libraries cmdliner
             sha
@@ -22,26 +22,35 @@
             learnocaml_server_args
             learnocaml_report)
 )
+(install
+ (files (learnocaml_main.bc.exe as learn-ocaml))
+ (section bin)
+ (package learn-ocaml))
 
 (executable
- (package learn-ocaml-client)
- (public_name learn-ocaml-client)
+;; (package learn-ocaml-client) ;; missing support in dune, manually installed below
+;; (public_name learn-ocaml-client)
  (name learnocaml_client)
- (modes byte)
- (ocamlc_flags :standard -custom)
- (flags :standard -linkall)
+ (modes byte_complete)
+ (ocamlc_flags -custom)
+ (flags :standard -linkall (:include linking_client.sexp))
  (modules Learnocaml_client)
  (libraries cmdliner
             sha
             lwt.unix
             lwt_utils
-            cohttp.lwt
+            cohttp-lwt
+            cohttp-lwt-unix
             grading_cli
             learnocaml_data
             learnocaml_store
             learnocaml_api
             token_index)
 )
+(install
+ (files (learnocaml_client.bc.exe as learn-ocaml-client))
+ (section bin)
+ (package learn-ocaml-client))
 
 (executable
  (package learn-ocaml)
@@ -49,4 +58,20 @@
  (name learnocaml_server_main)
  (modules learnocaml_server_main)
  (libraries learnocaml_server_args)
+ (flags       (:standard
+               (:include linking_server.sexp)))
 )
+
+(rule
+  (targets linking_main.sexp)
+  (action  (with-stdout-to %{targets}
+    (run ./linking_flags.sh linking_main.sexp %{env:LINKING_MODE=dynamic} %{ocaml-config:system} camlstrbyt checkseum_c_stubs netaccel_c threads unixbyt camlrun))))
+(rule
+  (targets linking_client.sexp)
+  (action  (with-stdout-to %{targets}
+    (run ./linking_flags.sh linking_client.sexp %{env:LINKING_MODE=dynamic} %{ocaml-config:system} camlstrbyt netaccel_c threads unixbyt camlrun))))
+(rule
+  (targets linking_server.sexp)
+  (action  (with-stdout-to %{targets}
+    (run ./linking_flags.sh linking_server.sexp %{env:LINKING_MODE=dynamic} ++%{ocaml-config:system} camlstrnat checkseum_c_stubs threadsnat unixnat))))
+

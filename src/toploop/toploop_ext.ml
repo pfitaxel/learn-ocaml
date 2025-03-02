@@ -1,27 +1,12 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
-type 'a toplevel_result = 'a Toploop_results.toplevel_result =
-  (* ('a * warning list, error * warning list) result = *)
-  | Ok of 'a * warning list
-  | Error of error * warning list
-
-and error = Toploop_results.error =
-  { msg: string;
-    locs: loc list;
-    if_highlight: string; }
-
-and warning = error
-
-and loc = Toploop_results.loc  = {
-  loc_start: int * int;
-  loc_end: int * int;
-}
+include Toploop_results
 
 module Ppx = struct
 
@@ -59,77 +44,34 @@ end
 
 let warnings = ref []
 
-let convert_loc loc =
-  let _file1,line1,col1 = Location.get_pos_info (loc.Location.loc_start) in
-  let _file2,line2,col2 = Location.get_pos_info (loc.Location.loc_end) in
-  { loc_start = (line1, col1) ; loc_end = (line2, col2) }
-
 let () =
-  Location.warning_printer :=
-    (fun loc _fmt w ->
-       if Warnings.is_active w then begin
-         let buf = Buffer.create 503 in
-         let ppf = Format.formatter_of_buffer buf in
-         Location.print ppf loc;
-         Format.fprintf ppf "Warning %a@." Warnings.print w;
-         let msg = Buffer.contents buf in
-         Buffer.reset buf;
-         Format.fprintf ppf "Warning %a@." Warnings.print w;
-         let if_highlight = Buffer.contents buf in
-         let loc = convert_loc loc in
-         warnings := { msg; locs = [loc]; if_highlight } :: !warnings
-       end)
+  Location.warning_reporter :=
+    (fun loc w ->
+       match Warnings.report w with
+       | `Inactive -> None
+       | `Active { Warnings.id = _; message; is_error = _; sub_locs } ->
+           let r = (loc, message), sub_locs in
+           warnings := r :: !warnings;
+           None)
 
 let return_success (e: 'a) : 'a toplevel_result = Ok (e, !warnings)
 let return_error e : 'a toplevel_result  = Error (e, !warnings)
-(* let return_unit_success = return_success () *)
 
 (** Error handling *)
-let dummy_ppf = Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
-
-let rec report_error_rec hg_ppf ppf {Location.loc; msg; sub; if_highlight} =
-  Location.print ppf loc;
-  Format.pp_print_string ppf msg;
-  let hg_ppf =
-    if if_highlight <> "" then
-      (Format.pp_print_string hg_ppf if_highlight; dummy_ppf)
-    else
-      (Format.pp_print_string hg_ppf msg; hg_ppf) in
-  let locs =
-    List.concat @@
-    List.map
-      (fun err ->
-         Format.pp_force_newline ppf ();
-         Format.pp_open_box ppf 2;
-         let locs = report_error_rec hg_ppf ppf err in
-         Format.pp_close_box ppf ();
-         locs)
-      sub in
-  convert_loc loc :: locs
-
-let report_error err =
-  let buf = Buffer.create 503 in
-  let ppf = Format.formatter_of_buffer buf in
-  let hg_buf = Buffer.create 503 in
-  let hg_ppf = Format.formatter_of_buffer hg_buf in
-  let locs = report_error_rec hg_ppf ppf err in
-  Format.pp_print_flush ppf ();
-  Format.pp_print_flush hg_ppf ();
-  let msg = Buffer.contents buf in
-  let if_highlight = Buffer.contents hg_buf in
-  { msg; locs; if_highlight; }
 
 let error_of_exn exn =
   match Location.error_of_exn exn with
-  | None ->
+  | None | Some `Already_displayed ->
       let msg = match exn with
         | Failure msg -> msg
         | exn -> Printexc.to_string exn
       in
-      { msg; locs = []; if_highlight = msg }
-  | Some error -> report_error error
+      let main = { Location.txt = (fun fmt -> Format.pp_print_text fmt msg);
+                   loc = Location.none } in
+      { Location.main; sub = []; kind = Location.Report_error }
+  | Some (`Ok report) -> report
 
-let return_exn exn = return_error (error_of_exn exn)
+let return_exn exn = return_error (of_report (error_of_exn exn))
 
 (** Execution helpers *)
 
@@ -199,7 +141,7 @@ let execute ?ppf_code ?(print_outcome  = true) ~ppf_answer code =
       return_success true
   | exn ->
       flush_all ();
-      return_error (error_of_exn exn)
+      return_exn exn
 
 let use_string
     ?(filename = "//toplevel//") ?(print_outcome  = true) ~ppf_answer code =
@@ -223,7 +165,7 @@ let use_string
       return_success false
   | exn ->
       flush_all ();
-      return_error (error_of_exn exn)
+      return_exn exn
 
 let parse_mod_string ?filename modname sig_code impl_code =
   let open Parsetree in
@@ -243,7 +185,7 @@ let parse_mod_string ?filename modname sig_code impl_code =
         init_loc sig_lb (String.uncapitalize_ascii modname ^ ".mli");
         let s = Parse.interface sig_lb in
         Mod.constraint_ (Mod.structure str) (Mty.signature s) in
-  Ptop_def [ Str.module_ (Mb.mk (Location.mknoloc modname) m) ]
+  Ptop_def [ Str.module_ (Mb.mk (Location.mknoloc (Some modname)) m) ]
 
 let use_mod_string
     ?filename
@@ -264,15 +206,15 @@ let use_mod_string
     return_success res
   with exn ->
     flush_all ();
-    return_error (error_of_exn exn)
+    return_exn exn
 
 (* Extracted from the "execute" function in "ocaml/toplevel/toploop.ml" *)
 let check_phrase env = function
   | Parsetree.Ptop_def sstr ->
       Typecore.reset_delayed_checks ();
-      let (str, sg, newenv) = Typemod.type_toplevel_phrase env sstr in
-      let sg' = Typemod.simplify_signature sg in
-      ignore (Includemod.signatures env sg sg');
+      let (str, sg, sn, _shape, newenv) = Typemod.type_toplevel_phrase env sstr in
+      let sg' = Typemod.Signature_names.simplify newenv sn sg in
+      ignore (Includemod.signatures env ~mark:Includemod.Mark_positive sg sg');
       Typecore.force_delayed_checks ();
       let _lam = Translmod.transl_toplevel_definition str in
       Warnings.check_fatal ();
@@ -297,3 +239,194 @@ let check ?(setenv = false) code =
   | End_of_file -> return_success ()
   | exn -> return_exn exn
 
+let inject_sig name sign =
+  Toploop.toplevel_env :=
+    Env.add_module
+      (Ident.create_persistent name)
+      Types.Mp_present
+      (Types.Mty_signature sign)
+      !Toploop.toplevel_env
+
+let load_cmi_from_string cmi_str =
+  (* Cmi_format.input_cmi only supports reading from a channel *)
+  let magic_len = String.length Config.cmi_magic_number in
+  if String.length cmi_str < magic_len ||
+     String.sub cmi_str 0 magic_len <> Config.cmi_magic_number then
+    Printf.ksprintf failwith "Bad cmi file";
+  let (name, sign) = Marshal.from_string cmi_str magic_len in
+  (* we ignore crc and flags *)
+  inject_sig name sign
+
+let inject_global_hook: (Ident.t -> unit) ref = ref (fun _ -> ())
+
+let set_inject_global_hook f = inject_global_hook := f
+
+let inject_global name obj =
+  let id = Ident.create_persistent name in
+  let fake_buf = Misc.LongString.create 4 in
+  let reloc = [Cmo_format.Reloc_setglobal id, 0] in
+  Symtable.patch_object fake_buf reloc;
+  (* we don't care about patching but this is the only entry point that allows us to register the global *)
+  Symtable.check_global_initialized reloc;
+  Symtable.update_global_table ();
+  Symtable.assign_global_value id obj;
+  !inject_global_hook id
+
+
+(** Printing *)
+
+(* Replacement for [Toploop.print_value] that doesn't segfault on yet
+   unregistered extension constructors (needed for printing types defined in
+   test.ml from within test.ml). *)
+module Printer = Genprintval.Make(Obj)(struct
+    type valu = Obj.t
+    exception Error
+    let eval_address = function
+      | Env.Aident id ->
+          if Ident.persistent id || Ident.global id then
+            Symtable.get_global_value id
+          else begin
+            let name = Translmod.toplevel_name id in
+            try Toploop.getvalue name
+            with _ -> raise Error
+          end
+      | Env.Adot(_, _) ->
+          (* in this case we bail out because this may refer to a
+             yet-unregistered extension constructor within the current module.
+             The printer has a reasonable fallback. *)
+          raise Error
+    let same_value v1 v2 = (v1 == v2)
+  end)
+
+let pending_installed_printers = ref []
+
+(** Relies on the env (already loaded cmi) to get the correct type parameters
+    for the [Printer] functions *)
+let install_printer modname id tyname pr =
+  let open Types in
+  let inmodpath id =
+    match String.split_on_char '.' modname with
+    | md::r ->
+        List.fold_left (fun acc id -> Path.Pdot (acc, id))
+          (Path.Pident (Ident.create_persistent md)) (r @ [id])
+    | [] ->
+        Path.Pident (Ident.create_local id)
+  in
+  let printer_path = inmodpath id in
+  let env = !Toploop.toplevel_env in
+  let ( @-> ) a b = Ctype.newty (Tarrow (Asttypes.Nolabel, a, b, commu_var ())) in
+  let gen_printer_type ty =
+    let format_ty =
+      let ( +. ) a b = Path.Pdot (a, b) in
+      Path.Pident (Ident.create_persistent "Stdlib") +. "Format" +. "formatter"
+    in
+    (Ctype.newty (Tconstr (format_ty, [], ref Mnil))
+     @-> ty
+     @-> Predef.type_unit)
+  in
+  let ty_path1 = inmodpath tyname in
+  match
+    Env.find_value printer_path env,
+    try ty_path1, Env.find_type ty_path1 env
+    with Not_found -> Env.find_type_by_name (Longident.Lident tyname) env
+  with
+  | exception Not_found ->
+      Format.printf
+        "Warning: bad printer definition %s.print_%s. The type and printer \
+         must be found in the cmi file (no mli file allowed).@."
+        modname tyname
+  | printer_desc, (ty_path, ty_decl) ->
+      let ty_target =
+        Ctype.with_local_level @@ fun () ->
+        let ty_args = List.map (fun _ -> Ctype.newvar ()) ty_decl.type_params in
+        let ty_target =
+          Ctype.expand_head env
+            (Ctype.newty (Tconstr (ty_path, ty_args, ref Mnil)))
+        in
+        let printer_ty_expected =
+          List.fold_right (fun argty ty -> gen_printer_type argty @-> ty)
+            ty_args
+            (gen_printer_type ty_target)
+        in
+        (try
+           Ctype.unify env
+             printer_ty_expected
+             (Ctype.instance printer_desc.val_type)
+         with Ctype.Unify _ ->
+           Format.printf
+             "Warning: mismatching type for print function %s.print_%s.@;\
+              The type must be@ @[<hov>%aformatter -> %a%s -> unit@]@."
+             modname tyname
+             (Format.pp_print_list
+                (fun ppf -> Format.fprintf ppf "(formatter -> %a -> unit) ->@ "
+                    (Printtyp.type_expr)))
+             ty_args
+             (fun ppf -> function
+                | [] -> ()
+                | [arg] -> Format.fprintf ppf "%a " Printtyp.type_expr arg
+                | args ->
+                    Format.fprintf ppf "(%a) "
+                      (Format.pp_print_list
+                         ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
+                         Printtyp.type_expr)
+                      args)
+             ty_args
+             tyname);
+        Ctype.generalize printer_ty_expected;
+        ty_target
+      in
+      let register_as_path = inmodpath ("print_"^tyname) in
+      let rec build_generic v = function
+        | [] ->
+            Genprintval.Zero
+              (fun formatter repr -> Obj.obj v formatter (Obj.obj repr))
+        | _ :: args ->
+            Genprintval.Succ
+              (fun fn -> build_generic ((Obj.obj v : _ -> Obj.t) fn) args)
+      in
+      (* Register for our custom 'Printer' as used by the graders *)
+      let () =
+        if ty_decl.type_params = [] then
+          Printer.install_printer register_as_path ty_target
+            (fun ppf repr -> Obj.magic pr ppf (Obj.obj repr))
+        else
+          let ty_path_args =
+            match get_desc ty_target with
+            | Tconstr (ty_path, args, _) -> Some (ty_path, args)
+            | Tlink ty -> (match get_desc ty with
+                | Tconstr (ty_path, args, _) -> Some (ty_path, args)
+                | _ -> None)
+            | _ -> None
+          in
+          match ty_path_args with
+          | Some (ty_path, args)
+            when Ctype.all_distinct_vars env args ->
+              Printer.install_generic_printer' register_as_path ty_path
+                (build_generic (Obj.repr pr) ty_decl.type_params)
+          | _ ->
+            Format.printf
+              "Warning: invalid printer for %a = %a: OCaml doesn't support \
+               printers for types with partially instanciated variables. \
+               Define a generic printer and a printer for the type of your \
+               variable instead."
+              Printtyp.path ty_path
+              Printtyp.type_expr (Ctype.newty (get_desc ty_target))
+      in
+      (* Register for the toplevel built-in printer (the API doesn't allow us to
+         override it). Attempting to use the printer registered this way before
+         the module is fully loaded would risk crashes (e.g. on extensible
+         variants) *)
+      let rec path_to_longident = function
+        | Path.Pdot (p, s) | Path.Pextra_ty (p, Path.Pcstr_ty s) ->
+            Longident.Ldot (path_to_longident p, s)
+        | Path.Pident i -> Longident.Lident (Ident.name i)
+        | Path.Pextra_ty (p, Path.Pext_ty) -> path_to_longident p
+        | Path.Papply _ -> assert false
+      in
+      pending_installed_printers :=
+        path_to_longident printer_path :: !pending_installed_printers
+
+let register_pending_printers () =
+  List.iter (Topdirs.dir_install_printer Format.std_formatter)
+    (List.rev !pending_installed_printers);
+  pending_installed_printers := []

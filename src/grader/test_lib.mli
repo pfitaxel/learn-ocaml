@@ -1,14 +1,13 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
 (** Documentation for [test_lib] library. [Test_lib] module can be
    used to write graders for learn-ocaml.  *)
-module type S = sig
 
   val set_result : Learnocaml_report.t -> unit
 
@@ -79,7 +78,7 @@ module type S = sig
       ?on_structure_item: (Parsetree.structure_item -> Learnocaml_report.t) ->
       ?on_external: (Parsetree.value_description -> Learnocaml_report.t) ->
       ?on_include: (Parsetree.include_declaration -> Learnocaml_report.t) ->
-      ?on_open: (Parsetree.open_description -> Learnocaml_report.t) ->
+      ?on_open: (Parsetree.open_declaration -> Learnocaml_report.t) ->
       ?on_module_occurence: (string -> Learnocaml_report.t) ->
       ?on_variable_occurence: (string -> Learnocaml_report.t) ->
       ?on_function_call: (
@@ -267,7 +266,7 @@ module type S = sig
     val test : 'a tester
 
     (** [test_ignore] is a {!S.tester} that compares only the constructor of its
-       {S.result} inputs. The content is ignored. If the constructors
+       {!S.result} inputs. The content is ignored. If the constructors
        match, an empty report is returned. *)
     val test_ignore : 'a tester
 
@@ -284,7 +283,7 @@ module type S = sig
     val test_eq_exn : (exn -> exn -> bool) -> 'a tester
 
     (** [test_canon canon] builds a {!S.tester} that compares its two
-       {S.result} inputs after application to [canon] function with
+       {!S.result} inputs after application to [canon] function with
        Ocaml structural equality. *)
     val test_canon : ('a result -> 'a result) -> 'a tester
 
@@ -379,7 +378,7 @@ module type S = sig
        also made at this time and so mutate during solution
        execution. They can then be compared with [out.test].
 
-       [out.test] is a {S.tester} which actually builds two reports,
+       [out.test] is a {!S.tester} which actually builds two reports,
        one using its optional argument [~test_result] and one that
        compares the values of the references set previously using
        [test_ref]. By default [~test_result] is equal to
@@ -448,7 +447,7 @@ module type S = sig
        where each element are generated using [sample].
 
      If [~sorted:true] ([false] by default) the generated list is
-       sorted (using Pervasives.compare).
+       sorted (using Stdlib.compare).
 
      If [~dups:false] ([true] by default), all elements of generated
        list are unique.*)
@@ -466,7 +465,9 @@ module type S = sig
        sorted.
 
      If [~dups:false] ([true] by default), all elements of generated
-       array are unique.*)
+       arrays are unique, or at least try hard to be in a reasonable time:
+       if the codomain of [sampler] is too small there might still be
+       duplicates.*)
     val sample_array :
       ?min_size: int -> ?max_size: int -> ?dups: bool -> ?sorted: bool
       -> 'a sampler
@@ -496,14 +497,29 @@ module type S = sig
     val printable_fun : string -> (_ -> _ as 'f) -> 'f
   end
 
+  (** For internal use, needed for the default samplers registration *)
+  module Sampler_reg : sig
+    type 'a sampler = 'a Sampler.sampler
+    val sample_int : int sampler
+    val sample_float : float sampler
+    val sample_string : string sampler
+    val sample_char : char sampler
+    val sample_bool : bool sampler
+    val sample_list : 'a sampler -> 'a list sampler
+    val sample_array : 'a sampler -> 'a array sampler
+    val sample_option : 'a sampler -> 'a option sampler
+    type ('a, 'b) pair = 'a * 'b
+    val sample_pair : 'a sampler -> 'b sampler -> ('a, 'b) pair sampler
+  end
+
   (** {1 Grading functions for references and variables } *)
 
   (** Grading function for variables and references. *)
   module Test_functions_ref_var : sig
 
-    (** [test_ref ty got exp] returns {!LearnOcaml_report.Success 1}
+    (** [test_ref ty got exp] returns {!Learnocaml_report.Success 1}
        report if reference [got] value is equal to [exp] and
-       {!LearnOcaml_report.Failure} report otherwise.
+       {!Learnocaml_report.Failure} report otherwise.
 
         {e WARNING:} contrary to other grading functions, you cannot
        use this function to evaluate a reference defined or modified
@@ -513,22 +529,22 @@ module type S = sig
     val test_ref :
       'a Ty.ty -> 'a ref -> 'a -> Learnocaml_report.t
 
-    (** [test_variable ty name r] returns {!LearnOcaml_report.Success
+    (** [test_variable ty name r] returns {!Learnocaml_report.Success
         1} report if variable named [name] exists and is equal to
-        [r]. Otherwise returns {!LearnOcaml_report.Failure} report.*)
+        [r]. Otherwise returns {!Learnocaml_report.Failure} report.*)
     val test_variable :
       'a Ty.ty -> string -> 'a -> Learnocaml_report.t
 
     (** [test_variable_property ty name cb] returns the report
         resulting of application of cb to variable named [name] if it
-        exists.  Otherwise returns {!LearnOcaml_report.Failure} report.  *)
+        exists.  Otherwise returns {!Learnocaml_report.Failure} report.  *)
     val test_variable_property :
       'a Ty.ty -> string -> ('a -> Learnocaml_report.t) -> Learnocaml_report.t
 
-    (** [test_variable ty name r] returns {!LearnOcaml_report.Success
+    (** [test_variable ty name r] returns {!Learnocaml_report.Success
         1} report if variable named [name] exists and is equal to
         variable with the same name defined in solution. Otherwise returns
-        {!LearnOcaml_report.Failure} report.*)
+        {!Learnocaml_report.Failure} report.*)
     val test_variable_against_solution :
       'a Ty.ty -> string -> Learnocaml_report.t
 
@@ -581,7 +597,7 @@ module type S = sig
 
     (** {3 Returned report}*)
 
-    (** The grading functions for functions return a {report} which
+    (** The grading functions for functions return a {!report} which
        actually concatenated 4 reports generated by (in this order):
 
       - the tester [~test]
@@ -604,7 +620,7 @@ module type S = sig
        outputs.
 
      A test [(arg-1, r, out, err)] results in a
-       {!LearnOcaml_report.Success 1} report if the student function
+       {!Learnocaml_report.Success 1} report if the student function
        applied to [arg-1] is equal to [r] and if standard output and
        standard error messages match [out] and [err] respectively. The
        result of a test is a {!Learnocaml_report.Failure} report otherwise.
@@ -626,7 +642,7 @@ module type S = sig
        named [name] by comparing outputs obtained with the student
        function against outputs of [rf].
 
-     A test [arg-1] results in a {!LearnOcaml_report.Success 1} report
+     A test [arg-1] results in a {!Learnocaml_report.Success 1} report
        if the student function applied to [arg-1] gives the same
        result than the solution function [rf] applied to [arg-1]. Otherwise
        the result of a test is a {!Learnocaml_report.Failure} report.
@@ -652,7 +668,7 @@ module type S = sig
        which must be defined under name [name] in the corresponding
        [solution.ml] file.
 
-     A test [arg-1] results in a {!LearnOcaml_report.Success 1} report
+     A test [arg-1] results in a {!Learnocaml_report.Success 1} report
        if the student function applied to [arg-1] gives the same
        result than the solution function [rf] applied to
        [arg-1]. Otherwise the result of a test is a
@@ -697,7 +713,7 @@ module type S = sig
        outputs.
 
      A test [(arg-1, arg-2, r, out, err)] results in a
-       {!LearnOcaml_report.Success 1} report if the student function
+       {!Learnocaml_report.Success 1} report if the student function
        applied to [arg-1] and [arg-2] is equal to [r] and if standard
        output and standard error messages match [out] and [err]
        respectively. The result of a test is a
@@ -722,7 +738,7 @@ module type S = sig
        named [name] by comparing outputs obtained with the student
        function against outputs of [rf].
 
-     A test [(arg-1, arg-2)] results in a {!LearnOcaml_report.Success
+     A test [(arg-1, arg-2)] results in a {!Learnocaml_report.Success
        1} report if the student function applied to [arg-1] and
        [arg-2] gives the same result than the solution function [rf]
        applied to the same arguments. Otherwise the result of a test is a
@@ -752,7 +768,7 @@ module type S = sig
        be defined under name [name] in the corresponding [solution.ml]
        file.
 
-     A test [(arg-1, arg-2)] results in a {!LearnOcaml_report.Success
+     A test [(arg-1, arg-2)] results in a {!Learnocaml_report.Success
        1} report if the student function applied to [arg-1] and
        [arg-2] gives the same result than the solution function [rf]
        applied to the same arguments. Otherwise the result of a test
@@ -797,7 +813,7 @@ module type S = sig
        outputs.
 
      A test [(arg-1, arg-2, arg-3, r, out, err)] results in a
-       {!LearnOcaml_report.Success 1} report if the student function
+       {!Learnocaml_report.Success 1} report if the student function
        applied to [arg-1], [arg-2] and [arg-3] is equal to [r] and if
        standard output and standard error messages match [out] and
        [err] respectively. The result of a test is a
@@ -822,7 +838,7 @@ module type S = sig
        function against outputs of [rf].
 
      A test [(arg-1, arg-2, arg-3)] results in a
-       {!LearnOcaml_report.Success 1} report if the student function
+       {!Learnocaml_report.Success 1} report if the student function
        applied to [arg-1], [arg-2] and [arg-3] gives the same result
        than the solution function [rf] applied to the same
        arguments. Otherwise the result of a test is a
@@ -854,7 +870,7 @@ module type S = sig
        file.
 
      A test [(arg-1, arg-2, arg-3)] results in a
-       {!LearnOcaml_report.Success 1} report if the student function
+       {!Learnocaml_report.Success 1} report if the student function
        applied to [arg-1], [arg-2] and [arg-3] gives the same result
        than the solution function [rf] applied to the same
        arguments. Otherwise the result of a test is a
@@ -900,7 +916,7 @@ module type S = sig
        outputs.
 
      A test [(arg-1, arg-2, arg-3, arg-4, r, out, err)] results in a
-       {!LearnOcaml_report.Success 1} report if the student function
+       {!Learnocaml_report.Success 1} report if the student function
        applied to [arg-1], [arg-2], [arg-3] and [arg-4] is equal to
        [r] and if standard output and standard error messages match
        [out] and [err] respectively. The result of a test is a
@@ -926,7 +942,7 @@ module type S = sig
        function against outputs of [rf].
 
      A test [(arg-1, arg-2, arg-3m arg-4)] results in a
-       {!LearnOcaml_report.Success 1} report if the student function
+       {!Learnocaml_report.Success 1} report if the student function
        applied to [arg-1], [arg-2], [arg-3] and [arg-4] gives the same
        result than the solution function [rf] applied to the same
        arguments. Otherwise the result of a test is a
@@ -956,7 +972,7 @@ module type S = sig
        [solution.ml] file.
 
      A test [(arg-1, arg-2, arg-3, arg-4)] results in a
-       {!LearnOcaml_report.Success 1} report if the student function
+       {!Learnocaml_report.Success 1} report if the student function
        applied to [arg-1], [arg-2], [arg-3] and [arg-4] gives the same
        result than the solution function [rf] applied to the same
        arguments. Otherwise the result of a test is a
@@ -1000,7 +1016,8 @@ module type S = sig
     (** The various grading functions use numerous common optional
        argument. Here is a list in alphabetic order of each of them.
 
-    {3 ?⁠after} defines a function which is called with the current
+    {3 ?⁠after}
+    defines a function which is called with the current
        tested inputs, the student {!type:result} and the solution
        {!type:result} and returns a new report which is concatenated to
        reports built with [~test], [~test_sdtout] and [~test_sdterr].
@@ -1008,13 +1025,15 @@ module type S = sig
        [~before], [~before_user] or [~before_reference] and build an
        appropriate report. Default value is [fun _ _ _ -> []].
 
-    {3 ?before} defines a function called right before the application
+    {3 ?before}
+    defines a function called right before the application
        of student function to the current tested inputs. Default value
        is [fun _ -> ()]
 
      For [test_function_<args_nb>] only.
 
-    {3 ?before_reference} defines a function called right before the
+    {3 ?before_reference}
+    defines a function called right before the
        application of solution function to the current tested
        inputs. This function is called {b before} student function
        evaluation. Default value is [fun _ -> ()].
@@ -1022,7 +1041,8 @@ module type S = sig
      For [test_function_<args_nb>_against] and
        [test_function_<args_nb>_against_solution].
 
-    {3 ?before_user} defines a function called right before the
+    {3 ?before_user}
+    defines a function called right before the
        application of student function to the current tested
        inputs. This function is called {b after} solution function
        evaluation. Default value is [fun _ -> ()].
@@ -1030,7 +1050,8 @@ module type S = sig
      For [test_function_<args_nb>_against] and
        [test_function_<args_nb>_against_solution].
 
-    {3 ?gen} Number of automatically generated tested inputs. Inputs
+    {3 ?gen}
+    Number of automatically generated tested inputs. Inputs
        are generated using either sampler defined in the current
        environment or function defined with [~sampler] optional
        argument. By default, [gen] is [max 5 (10 - List.length
@@ -1041,7 +1062,8 @@ module type S = sig
 
      See {{!Sampler.sampler_sec}Sampler module}.
 
-    {3 ?sampler} defines the function used to automatically generated
+    {3 ?sampler}
+    defines the function used to automatically generated
        inputs. If unset, the grading function checks if a sampler is
        defined for each input type in the current environment. Such
        sampler for a type [some-type] must be named [sample_some-type]
@@ -1053,20 +1075,23 @@ module type S = sig
 
      See {{!Sampler.sampler_sec}Sampler module}.
 
-    {3 ?test} defines the function used to compare the output of
+    {3 ?test}
+    defines the function used to compare the output of
        student function and the output of solution function. Default
        value is {!Tester.test}.
 
      See {{!Tester.tester_sec}predefined testers and tester builders}.
 
-    {3 ?test_sdterr} defines the function used to compare the standard
+    {3 ?test_sdterr}
+    defines the function used to compare the standard
        output produced by student function and the one produced by
        solution function. Default value is {!Tester.io_test_ignore}.
 
      See {{!Tester.io_tester_sec}predefined IO testers and IO tester
        builders}.
 
-    {3 ?test_sdtout} defines the function used to compare the standard
+    {3 ?test_sdtout}
+    defines the function used to compare the standard
        error produced by student function and the one produced by
        solution function. Default value is {!Tester.io_test_ignore}.
 
@@ -1085,7 +1110,7 @@ module type S = sig
 
     (** [run_timeout ?time v] executes [v()] under an optional time limit.
         The exceptions raised by [v] are intentionally *not* caught,
-        so the caller is able to catch and get a backtrace, if desired. 
+        so the caller is able to catch and get a backtrace, if desired.
         If given, [time] overrides the global timeout parameter.
     *)
     val run_timeout : ?time:int -> (unit -> 'a) -> 'a
@@ -1237,12 +1262,18 @@ module type S = sig
    include (module type of Test_functions_ref_var)
    include (module type of Test_functions_function)
    include (module type of Test_functions_generic)
-end
+(* end *)
 
-module Make : functor
-  (Params : sig
-     val results : Learnocaml_report.t option ref
-     val set_progress : string -> unit
-     val timeout : int option
-     module Introspection : Introspection_intf.INTROSPECTION
-   end) -> S
+(* module Make : functor
+ *   (_ : sig
+ *      val results : Learnocaml_report.t option ref
+ *      val set_progress : string -> unit
+ *      val timeout : int option
+ *      module Introspection : Introspection_intf.INTROSPECTION
+ *    end) -> S *)
+(* module Report = Learnocaml_report
+ * include (module type of Pre_test) *)
+module Open_me: sig
+  module Report = Learnocaml_report
+  include module type of Pre_test
+end

@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -38,10 +38,12 @@ let args = Arg.align @@
 
 open Lwt.Infix
 
+type kind = Exercise of string*bool | Lesson of string*bool | Playground of string*bool | Toplevel
+
 let read_static_file path =
   Lwt_io.(with_file ~mode: Input (sanitise_path !static_dir path) read)
 
-exception Too_long_body
+(*exception Too_long_body
 
 let string_of_stream ?(max_size = 1024 * 1024) s =
   let b = Buffer.create (64 * 1024) in
@@ -61,7 +63,7 @@ let string_of_stream ?(max_size = 1024 * 1024) s =
   end begin function
     | Too_long_body -> Lwt.return None
     | e -> Lwt.fail e
-  end
+  end*)
 
 module Api = Learnocaml_api
 
@@ -96,7 +98,14 @@ type 'a response =
 
 type error = (Cohttp.Code.status_code * string)
 
-let caching: type resp. resp Api.request -> caching = function
+let disable_cache =
+  match Sys.getenv_opt "LEARNOCAML_SERVER_NOCACHE" with
+  | None | Some ("" | "0" | "false") -> false
+  | Some _ -> true
+
+let caching: type resp. resp Api.request -> caching = fun resp ->
+  if disable_cache then Nocache else
+  match resp with
   | Api.Version () -> Shortcache (Some ["version"; "server_id"])
   | Api.Static ("fonts"::_ | "icons"::_ | "js"::_::_::_ as p) -> Longcache p
   | Api.Static ("css"::_ | "js"::_ | _ as p) -> Shortcache (Some p)
@@ -190,7 +199,7 @@ let check_report exo report grade =
 let generate_csrf_token length =
   let random_bytes = Bytes.make length '\000' in
   Cryptokit.Random.secure_rng#random_bytes random_bytes 0 length;
-  B64.encode (Bytes.to_string random_bytes)
+  Base64.encode (Bytes.to_string random_bytes)
 
 let generate_hmac secret csrf user_id =
   let decoder = Cryptokit.Hexa.decode () in
@@ -323,7 +332,9 @@ module Request_handler = struct
          respond_json cache (Api.version, config.ServerData.server_id)
       | Api.Launch body when config.ServerData.use_moodle ->
          (* 32 bytes of entropy, same as RoR as of 2020. *)
-         let csrf_token = generate_csrf_token 32 in
+         let csrf_token =  match generate_csrf_token 32 with
+           | Ok tok -> tok
+           | Error (`Msg msg) -> failwith msg in
          let cookies = [Cohttp.Cookie.Set_cookie_hdr.make
                           ~expiration:(`Max_age (Int64.of_int 3600))
                           ~path:"/" ~http_only:true
@@ -340,7 +351,74 @@ module Request_handler = struct
                                   ~expiration:(`Max_age (Int64.of_int 60))
                                   ~path:"/"
                                   ("token", Token.to_string token)] in
-                 lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
+                 let rank = function Exercise (_,_) -> 0 | Lesson (_,_) -> 1 | Playground (_,_) -> 2 | Toplevel -> 3 in
+                 let sort_from_rank l = List.sort (fun (k1) (k2) -> rank k1 - rank k2) l in
+                 (*sort_from_rank [(Lesson, "first"); (Exercise, "demo"); (Playground, "editor")]*)
+                 let ex_exist exo = Exercise.Index.get () >>= fun exercises ->
+                                    let find_exercises_names contents = match contents with
+                                      | Learnocaml_data.Exercise.Index.Groups _ -> failwith "erreur find_exercises_names"
+                                      | Learnocaml_data.Exercise.Index.Exercises exos -> List.map fst exos in
+                                    let find_names exs = List.map
+                                                           (fun group -> find_exercises_names (snd group).Learnocaml_data.Exercise.Index.contents)
+                                                           exs in
+                                    let names = match exercises with
+                                      | Learnocaml_data.Exercise.Index.Groups exs -> List.concat (find_names exs)
+                                      | Learnocaml_data.Exercise.Index.Exercises _ -> [] in
+                                    Lwt.return (List.exists (fun name -> name = exo) names) in
+                 let play_exist play = Playground.Index.get () >>= fun playgrounds ->
+                                       let find_names exs = List.map
+                                                              (fun group -> (fst group))
+                                                              exs in
+                                       let names = find_names playgrounds in
+                                       Lwt.return (List.exists (fun name -> name = play) names) in
+                 let less_exist less = Lesson.Index.get () >>= fun lessons ->
+                                       let find_names exs = List.map
+                                                              (fun group -> (fst group))
+                                                              exs in
+                                       let names = find_names lessons in
+                                       Lwt.return (List.exists (fun name -> name = less) names) in
+                 let list_redirections l =
+                   Lwt_list.fold_left_s (fun r (kind, id) ->
+                                       match kind with
+                                       | "custom_exercise" -> ex_exist id >|= fun ok ->
+                                                              Exercise (id,ok) :: r
+                                       | "custom_playground" -> play_exist id >|= fun ok ->
+                                                                Playground (id, ok) :: r
+                                       | "custom_lesson" -> less_exist id >|= fun ok ->
+                                                            Lesson (id, ok) :: r
+                                       | "custom_toplevel" -> Lwt.return (Toplevel :: r)
+                                       | _ -> Lwt.return r
+                     ) [] l
+                 in
+                 let return_url kind_url = match kind_url with
+                   | Exercise (id,ok) -> if ok
+                                         then "/exercises/"^id^"/#tab%3Dtext"
+                                         else "/redirection?kind=exercise&id="^id
+                   | Playground (id,ok) -> if ok
+                                           then "/playground/"^id^"/#tab%3Dtoplevel"
+                                           else "/redirection?kind=playground&id="^id
+                   | Lesson (id,ok) -> if ok
+                                       then "/#activity%3Dlessons%26lesson%3D"^id
+                                       else "/redirection?kind=lesson&id="^id
+                   | Toplevel -> "/#activity%3Dtoplevel"
+                 in
+                 let return_url_many kind_url = match kind_url with
+                   | Exercise (id,ok) -> if ok
+                                         then "/redirection?kind=exercise&id="^id^"&many=true"
+                                         else "/redirection?kind=exercise&id="^id
+                   | Playground (id,ok) -> if ok
+                                           then "/redirection?kind=playground&id="^id^"&many=true"
+                                           else "/redirection?kind=playground&id="^id
+                   | Lesson (id,ok) -> if ok
+                                       then "/redirection?kind=lesson&id="^id^"&many=true"
+                                       else "/redirection?kind=lesson&id="^id
+                   | _ -> "/" in
+                 let redirection l = match sort_from_rank l with
+                     [] -> "/"
+                   | [url] -> return_url url
+                   | url :: _ -> return_url_many url in
+                 list_redirections params >>= fun list ->
+                 lwt_ok @@ Redirect { code=`See_other; url= !base_url^(redirection list); cookies }
                else
                  Token_index.OauthIndex.get_current_secret !sync_dir >>= fun secret ->
                  let hmac = generate_hmac secret csrf_token id in
@@ -490,13 +568,18 @@ module Request_handler = struct
             (function
              | Failure body -> (`Bad_request, body)
              | exn -> (`Internal_server_error, Printexc.to_string exn))
-      | Api.Create_teacher_token token ->
+      | Api.Create_teacher_token (token, nick) ->
          verify_teacher_token token
          >?= fun () ->
-             Token.create_teacher () >>= fun token ->
+             Token.create_teacher ()
+             >>= fun tok ->
+             (match nick with | None -> Lwt.return_unit
+                              | Some nickname ->
+                                 Save.set tok Save.{empty with nickname})
+             >>= fun () ->
              let auth = Token_index.Token (token, false) in
              Token_index.UserIndex.add !sync_dir auth >>= fun () ->
-             respond_json cache token
+             respond_json cache tok
       | Api.Create_user (email, nick, password, secret) when config.ServerData.use_passwd ->
          valid_string_of_endp conn
          >?= fun conn ->
@@ -544,7 +627,7 @@ module Request_handler = struct
          (fun exn -> (`Internal_server_error, Printexc.to_string exn))
       | Api.Archive_zip token ->
           let open Lwt_process in
-          let path = Filename.concat !sync_dir (Token.to_path token) in 
+          let path = Filename.concat !sync_dir (Token.to_path token) in
           let cmd = shell ("git archive master --format=zip -0 --remote="^path)
           and stdout = `FD_copy Unix.stdout in
           Lwt_process.pread ~stdin:stdout cmd >>= fun contents ->
@@ -700,17 +783,18 @@ module Request_handler = struct
       | Api.Exercise_index None ->
          lwt_fail (`Forbidden, "Forbidden")
 
-      | Api.Exercise (Some token, id) ->
+      | Api.Exercise (Some token, id, js) ->
           (Exercise.Status.is_open id token >>= function
           | `Open | `Deadline _ as o ->
               Exercise.Meta.get id >>= fun meta ->
               Exercise.get id >>= fun ex ->
+              let ex = Learnocaml_exercise.strip js ex in
               respond_json cache
                 (meta, ex,
                  match o with `Deadline t -> Some (max t 0.) | `Open -> None)
           | `Closed ->
              lwt_fail (`Forbidden, "Exercise closed"))
-      | Api.Exercise (None, _) ->
+      | Api.Exercise (None, _, _) ->
          lwt_fail (`Forbidden, "Forbidden")
 
       | Api.Lesson_index () ->
@@ -831,7 +915,9 @@ module Request_handler = struct
          Token_index.UpgradeIndex.can_reset_password !sync_dir handle >>=
            (function
             | Some _token ->
-               let csrf_token = generate_csrf_token 32 in
+               let csrf_token =  match generate_csrf_token 32 with
+                 | Ok tok -> tok
+                 | Error (`Msg msg) -> failwith msg in
                let cookies = [Cohttp.Cookie.Set_cookie_hdr.make
                                 ~expiration:(`Max_age (Int64.of_int 3600))
                                 ~path:"/" ~http_only:true
@@ -907,7 +993,9 @@ module Request_handler = struct
          Token_index.UserIndex.emails_of_token !sync_dir token >>=
            (function
             | None ->
-               let csrf_token = generate_csrf_token 32 in
+               let csrf_token =  match generate_csrf_token 32 with
+                 | Ok tok -> tok
+                 | Error (`Msg msg) -> failwith msg in
                let cookies = [Cohttp.Cookie.Set_cookie_hdr.make
                                 ~expiration:(`Max_age (Int64.of_int 3600))
                                 ~path:"/" ~http_only:true ("csrf", csrf_token)] in
@@ -955,7 +1043,49 @@ module Request_handler = struct
          lwt_fail (`Forbidden, "Users with passwords are disabled on this instance.")
 
       | Api.Server_config _ ->
-         lwt_fail (`Forbidden, "pas encore fait")
+         respond_json cache [("use_passwd", (string_of_bool config.ServerData.use_passwd))]
+
+      | Api.Exercise_score token ->
+         Save.get token >>= fun save ->
+         Exercise.Index.get () >>= fun exercises ->
+         let results = match save with
+           | Some save ->
+              SMap.map
+                (fun st -> Answer.(st.grade))
+                save.Save.all_exercise_states
+           | _ -> SMap.empty in
+
+         let find_exercises_names contents = match contents with
+           | Learnocaml_data.Exercise.Index.Groups _ -> failwith "erreur find_exercises_names"
+           | Learnocaml_data.Exercise.Index.Exercises exos -> List.map fst exos in
+
+         let find_names exs = List.map
+                                    (fun group -> find_exercises_names (snd group).Learnocaml_data.Exercise.Index.contents)
+                                    exs in
+
+         let names = match exercises with
+           | Learnocaml_data.Exercise.Index.Groups exs -> List.concat (find_names exs)
+           | Learnocaml_data.Exercise.Index.Exercises _ -> [] in
+
+         if SMap.is_empty results then
+           respond_json cache []
+         else
+           let rec grade_list exs = match exs with
+             | [] -> []
+             | ex_name::tail -> if SMap.exists (fun key _ -> key = ex_name ) results
+                                then match SMap.find ex_name results with
+                                     | Some grade -> (ex_name, (*string_of_int*) grade)::(grade_list tail)
+                                     | None -> (*(ex_name, "N/A")::*)(grade_list tail)
+                                else (*(ex_name, "N/A")::*)(grade_list tail) in
+           respond_json cache (grade_list names)
+
+      | Api.Set_nickname (token,nick) ->
+         Save.get token >>= fun osave ->
+         lwt_option_fail osave (`Not_found, Token.to_string token)
+         @@ fun save ->
+            let new_save = {save with Save.nickname = nick} in
+            Save.set token new_save >>= respond_json cache
+
       | Api.Invalid_request body ->
           lwt_fail (`Bad_request, body)
 
@@ -1022,13 +1152,56 @@ let last_modified = (* server startup time *)
     (tm.tm_year + 1900)
     tm.tm_hour tm.tm_min tm.tm_sec
 
-(* Taken from the source of "decompress", from bin/easy.ml *)
+(* Taken from the source of "decompress.1.5.3", from bin/decompress.ml *)
 let compress ?(level = 4) data =
-  let input_buffer = Bytes.create 0xFFFF in
-  let output_buffer = Bytes.create 0xFFFF in
 
-  let pos = ref 0 in
-  let res = Buffer.create (String.length data) in
+  let bigstring_input ic buf off len =
+    let tmp = Bytes.create len in
+    try
+      let len = input ic tmp 0 len in
+      for i = 0 to len - 1 do
+        buf.{off + i} <- Bytes.get tmp i
+      done
+      ; len
+    with End_of_file -> 0 in
+
+  let bigstring_output oc buf off len =
+    let res = Bytes.create len in
+    for i = 0 to len - 1 do
+      Bytes.set res i buf.{off + i}
+    done
+    ; output_string oc (Bytes.unsafe_to_string res) in
+
+let w = De.make_window ~bits:15
+let l = De.Lz77.make_window ~bits:15
+let o = De.bigstring_create De.io_buffer_size
+let i = De.bigstring_create De.io_buffer_size
+let q = De.Queue.create 4096
+let str fmt = Format.asprintf fmt
+let msgf fmt = Format.kasprintf (fun msg -> `Msg msg) fmt
+let error_msgf fmt = Format.kasprintf (fun err -> Error (`Msg err)) fmt
+
+  
+let run_zlib_deflate ~level ic oc =
+  let open Decompress.Zl in
+  let encoder = Def.encoder `Manual `Manual ~q ~w:l ~level in
+
+  let rec go encoder =
+    match Def.encode encoder with
+    | `Await encoder ->
+      let len = bigstring_input ic i 0 De.io_buffer_size in
+      Def.src encoder i 0 len |> go
+    | `Flush encoder ->
+      let len = De.io_buffer_size - Def.dst_rem encoder in
+      bigstring_output oc o 0 len
+      ; Def.dst encoder o 0 De.io_buffer_size |> go
+    | `End encoder ->
+      let len = De.io_buffer_size - Def.dst_rem encoder in
+      if len > 0 then bigstring_output oc o 0 len
+      ; `Ok 0 in
+  Def.dst encoder o 0 De.io_buffer_size |> go
+
+
 
   Lwt_preemptive.detach
     (Decompress.Zlib_deflate.bytes
@@ -1074,8 +1247,11 @@ let launch () =
   >>= fun () ->
   let callback conn req body =
     let uri = Request.uri req in
-    let path = Uri.path uri in
-    let path = Stringext.split ~on:'/' path in
+    let path =
+        Uri.path uri |>
+        Uri.pct_decode |> (* %-decoding must happen before `/`-splitting *)
+        Stringext.split ~on:'/'
+    in
     let path =
       let rec clean = function
         | [] | [_] as l -> l
@@ -1084,7 +1260,6 @@ let launch () =
       in
       clean path
     in
-    let path = List.map Uri.pct_decode path in
     let query = Uri.query uri in
     let args = List.map (fun (s, l) -> s, String.concat "," l) query in
     let use_compression =
@@ -1218,3 +1393,35 @@ let launch () =
   | e ->
       Printf.eprintf "Server error: %s\n%!" (Printexc.to_string e);
       Lwt.return false
+
+let check_running () =
+  try
+    let ic = Printf.ksprintf Unix.open_process_in "lsof -ti tcp:%d -s tcp:LISTEN" !port in
+    let pid = match input_line ic with
+      | "" -> None
+      | s -> int_of_string_opt s
+      | exception End_of_file -> None
+    in
+    close_in ic;
+    pid
+  with Unix.Unix_error _ ->
+    Printf.eprintf "Warning: could not check for previously running instance";
+    None
+
+let kill_running pid =
+  let timeout = 15 in
+  Unix.kill pid Sys.sigint;
+  Printf.eprintf "Waiting for process %d to terminate... %2d %!" pid timeout;
+  let rec aux tout =
+    Printf.eprintf "\027[3D%2d %!" tout;
+    if Printf.ksprintf Sys.command "lsof -ti tcp:%d -p %d >/dev/null" !port pid
+       = 0
+    then
+      if tout <= 0 then
+        (prerr_endline "Error: process didn't terminate in time"; exit 10)
+      else
+        (Unix.sleep 1;
+         aux (tout - 1))
+  in
+  aux timeout;
+  prerr_endline "\027[3Dok "

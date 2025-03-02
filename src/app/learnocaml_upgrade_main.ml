@@ -8,7 +8,7 @@
 open Js_utils
 open Lwt
 open Learnocaml_common
-open Learnocaml_api
+open Js_of_ocaml
 
 module El = struct
   let id s = s, find_component s
@@ -20,8 +20,26 @@ module El = struct
     let upgrade_password_id, upgrade_password = id "upgrade-password-input"
     let upgrade_confirmation_id, upgrade_confirmation = id "upgrade-confirmation-input"
     let upgrade_button_id, upgrade_button = id "upgrade-button"
+    let return_button_id, return_button = id "return-button"
   end
 end
+
+let rec drop_2_trailing = function
+  | [] | [_] | [_; _] -> []
+  | x :: l -> x :: drop_2_trailing l
+
+(* Replace location: from [http://localhost:8080/.../...]
+   to [http://localhost:8080] *)
+let redirect () =
+  let open Js_of_ocaml__Url in
+  match Url.Current.get () with
+  | Some (Http http_url) ->
+     let new_url = {http_url with hu_path = drop_2_trailing http_url.hu_path} in
+     Url.Current.set (Http new_url)
+  | Some (Https http_url) ->
+     let new_url = {http_url with hu_path = drop_2_trailing http_url.hu_path} in
+     Url.Current.set (Https new_url)
+  | Some _ | None -> ()
 
 let check_email_js email =
   let re = Regexp.regexp Learnocaml_data.email_regexp_js in
@@ -86,9 +104,13 @@ let init_token_dialog () =
                   email=&passwd=&confirmation=&csrf=Bfkxd/2TjpMAkq4bFGIs1hp9oxeBTZIKioMlQMUDlpk=&token=ZGB-GDD-SNB-41M*)
       >>= fun _ -> cb_alert ~title:[%i"VALIDATION REQUIRED"]
                      [%i"A confirmation e-mail has been sent to your address."]
-                     Js_utils.reload;
+                     redirect;
                    Lwt.return_none
   in
+
+  let return () = redirect ();
+                  Lwt.return_none in
+
   let handler f t = fun _ ->
     Lwt.async (fun () ->
         f () >|= function
@@ -96,7 +118,8 @@ let init_token_dialog () =
         | None -> ());
     t
   in
-  Manip.Ev.onclick upgrade_button (handler create_token false)
+  Manip.Ev.onclick upgrade_button (handler create_token false);
+  Manip.Ev.onclick return_button (handler return false)
 
 let set_string_translations =
   List.iter
@@ -117,6 +140,7 @@ let () =
         "txt_upgrade_password", [%i"Password"];
         "txt_upgrade_password_confirmation", [%i"Confirm password"];
         "txt_do_upgrade", [%i"Upgrade"];
+        "txt_do_return", [%i"Return"];
         "txt_info", [%i"An e-mail will be sent to your address to confirm it."];
       ];
     init_token_dialog ()

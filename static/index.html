@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8">
@@ -22,8 +23,11 @@
     </div>
     <div id="learnocaml-main-toolbar">
       <div class="logo">
-        <img src="/icons/logo_ocaml.svg">
+        <img src="/icons/logo_ocsf.svg">
         <span>Learn OCaml</span>
+        <a class="btn" href="https://github.com/learn-ocaml-community/teaching-feedback#readme" target = "_blank">
+          <img id="learnocaml-main-feedback" title="Send Feedback" src="/icons/icon_feedback.svg">
+        </a>
       </div>
     </div>
     <div id="learnocaml-main-panel" class="hidden">
@@ -91,6 +95,7 @@
                  minlength="1" autocomplete="off"></input>
         </div>
         <button id="token-new-button"><span id="txt_token_new"><!-- Create new token --></span></button>
+        <a href="#login-returning"><div id="txt_returning_link"><!-- Returning user --></div></a>
       </div>
       <div id="login-returning">
         <h4 id="txt_returning"><!-- Returning user --></h4>
@@ -155,6 +160,7 @@
                  autocomplete="off">
         </div>
         <button id="login-token-button"><span id="txt_token_returning"><!-- Connect --></span></button>
+        <a href="#login-new"><div id="txt_first_connection_link"><!-- First connection --></div></a>
       </div>
     </div>
     <div id="learnocaml-main-loading" class="loaded"></div>

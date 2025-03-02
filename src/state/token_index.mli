@@ -85,7 +85,13 @@ module UserIndex: sig
   (** Update password *)
   val update : string -> Learnocaml_data.Token.t -> string -> unit Lwt.t
 
+  (** Set the field "confirm_email" for the corresponding token to `None` *)
   val confirm_email : string -> Learnocaml_data.Token.t -> unit Lwt.t
+
+  (** Check if the login attempt is valid, based on the provided token:
+   *  The boolean `true` is returned only if the token exists in the database,
+   *  and is not used by an upgraded account (either moodle or password).
+   *)
   val can_login :
     ?use_passwd:bool -> ?use_moodle:bool ->
     string -> Learnocaml_data.Token.t -> bool Lwt.t
@@ -99,6 +105,11 @@ module UserIndex: sig
    *)
   val emails_of_token : string -> Learnocaml_data.Token.t  -> ((string * string option) option) Lwt.t
   val change_email : string -> Learnocaml_data.Token.t -> string -> unit Lwt.t
+
+  (** Abort an email change initiated by some user:
+   *  The field "email_change" is modified from `Some pending` to `None`,
+   *  and an error is raised if the token was already used by a non-upgraded account.
+   *)
   val abort_email_change : string -> Learnocaml_data.Token.t -> unit Lwt.t
 end
 

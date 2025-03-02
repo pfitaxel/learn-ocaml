@@ -1,10 +1,12 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
+
+open Js_of_ocaml_tyxml
 
 (** Toplevel output console. *)
 
@@ -77,6 +79,8 @@ val output_stderr : ?phrase: phrase -> output -> string -> unit
 (** Output HTML in a [div] element with class [toplevel-html-block]. *)
 val output_html : ?phrase: phrase -> output -> string -> unit
 
+val output_svg : ?phrase: phrase -> output -> string -> unit
+
 (** Output ocaml code in a [pre] element with class [toplevel-code].
     Code tokens are wrapped in [span] elements with classes as
     documented in {!Ocaml_mode.token_type}. An intermediate level of
@@ -91,11 +95,11 @@ val output_answer : ?phrase: phrase -> output -> string -> unit
 
 (** Output an error in a [pre] element with class [toplevel-error].
     A [span] with class [ref] is used for location labels. *)
-val output_error : ?phrase: phrase -> output -> Toploop_results.error -> unit
+val output_error : ?phrase: phrase -> output -> Location.report -> unit
 
 (** Output a warning in a [pre] element with class [toplevel-warning].
     A [span] with class [ref] is used for location labels. *)
-val output_warning : ?phrase: phrase -> output -> Toploop_results.warning -> unit
+val output_warning : ?phrase: phrase -> output -> Location.report -> unit
 
 (** Format OCaml code in the style of {!output_code}. *)
 val format_ocaml_code : string -> [> `Span | `PCDATA ] Tyxml_js.Html5.elt list

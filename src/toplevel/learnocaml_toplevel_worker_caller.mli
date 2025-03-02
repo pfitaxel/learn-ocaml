@@ -1,17 +1,19 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
 (** An unified interface for OCaml toplevels running in a Web Worker
     or not. This module signature is very simalar to the signature of
-    {!module:Learnocaml_toplevel_toploop}, except: {ul {- all blocking functions
-    will kill the underlying Web Worker when cancelled; a new worker
-    will be spawned. } {- it uses function of type [string -> unit] as
-    outputs instead of [Format.formatter].}}. *)
+    {!module:Learnocaml_toplevel_toploop}, except:
+      {ul
+      {- all blocking functions will kill the underlying Web Worker when
+        cancelled; a new worker will be spawned. }
+      {- it uses function of type [string -> unit] as outputs instead
+        of [Format.formatter].}} *)
 
 open Toploop_results
 
@@ -82,6 +84,18 @@ val execute:
 val set_checking_environment:
   t -> unit toplevel_result Lwt.t
 
+(** Execute a given compiled code (ocaml object or jsoo-compiled version).
+
+    @param pp_answer see {!val:execute}.
+
+    @return as {!val:execute}.
+
+*)
+val use_compiled_string:
+  t ->
+  pp_answer:(string -> unit) ->
+  string -> bool toplevel_result Lwt.t
+
 (** Execute a given source code. The code is parsed and
     typechecked all at once before to start the evaluation.
 
@@ -129,6 +143,7 @@ val register_callback : t -> string -> (string -> unit) -> unit toplevel_result 
     environment. *)
 val reset: t -> ?timeout:(unit -> unit Lwt.t) -> unit -> unit Lwt.t
 
+val load_cmi_from_string: t -> string -> unit toplevel_result Lwt.t
 
 (** Terminate the toplevel, i.e. destroy the Web Worker. It does
     nothing if the toplevel as been created with [async=false]. *)

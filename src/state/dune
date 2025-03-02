@@ -10,9 +10,20 @@
  (modules Learnocaml_data)
  (libraries asak
             sha
+            cryptokit
+            unix
             learnocaml_toplevel_history
             learnocaml_report
             learnocaml_repository)
+)
+
+(library
+  (name learnocaml_data_test)
+  (wrapped false)
+  (modules Learnocaml_data_test)
+  (libraries learnocaml_data)
+  (inline_tests)
+  (preprocess (pps ppx_expect ppx_inline_test))
 )
 
 (library
@@ -20,7 +31,7 @@
  (wrapped false)
  (flags :standard -warn-error +8)
  (modules Learnocaml_version Learnocaml_api)
- (libraries ocplib-json-typed
+ (libraries json-data-encoding
             ezjsonm
             conduit
             learnocaml_data)
@@ -30,7 +41,7 @@
  (name token_index)
  (wrapped false)
  (modules Token_index)
- (libraries lwt lwt.unix lwt_utils learnocaml_api learnocaml_data cryptokit netstring safepass)
+ (libraries base64 lwt lwt.unix lwt_utils learnocaml_api learnocaml_data cryptokit safepass irmin irmin-git)
 )
 
 (library
