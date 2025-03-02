@@ -1,29 +1,56 @@
 (* -*- coding: utf-8-unix; -*- *)
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019-2020 OCaml Software Foundation.
+ * Copyright (C) 2019-2025 OCaml Software Foundation.
  * Copyright (C) 2016-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
-open Netsendmail
-(* href: https://gitlab.com/gerdstolpmann/lib-ocamlnet3/-/blob/master/code/src/netstring/netsendmail_tut.txt *)
+(* We don't use
+   [ocamlnet](https://gitlab.com/gerdstolpmann/lib-ocamlnet3/-/blob/master/code/src/netstring/netsendmail_tut.txt)
+   anymore as it requires "ocaml" < 5 *)
 
-let smtp_enabled_returnpath_email =
-  match Sys.getenv_opt "SMTPSERVER" with
-  | None -> None
-  | Some _ ->
-     match Sys.getenv_opt "EMAIL" with
-     | None -> None
-     | Some email -> Some email
+(*
+  LEARNOCAML_BASE_URL: "http://localhost:8080"
+  # (ocaml variable) <container_name>.<network_name>:
+  FROM_DOMAIN: "backend.localdomain"
+  # (smtp variable) hostname of the SMTP server:
+  SMTPSERVER: "maildev"
+  # SMTPSERVER: "postfix"
+  # (ocaml + smtp variable) Reply-To = Return-Path:
+  EMAIL: "noreply@example.com"
+ *)
 
-(* We don't use /usr/sbin/sendmail but msmtp (alpine package) *)
-let mailer =  "/usr/bin/msmtp" ^
-                begin match Sys.getenv_opt "FROM_DOMAIN" with
-                | Some domain -> " --domain " ^ domain
-                | None -> ""
-                end
+let smtp_server =
+  Sys.getenv_opt "LEARNOCAML_SMTP_SERVER"
+
+let smtp_auth_user =
+  Sys.getenv_opt "LEARNOCAML_SMTP_AUTH_USER"
+
+let smtp_auth_passwd =
+  Sys.getenv_opt "LEARNOCAML_SMTP_AUTH_PASSWD"
+
+let smtp_port =
+  Sys.getenv_opt "LEARNOCAML_SMTP_PORT"
+
+let smtp_from_email = (* Reply-To = Return-Path *)
+  Sys.getenv_opt "LEARNOCAML_SMTP_FROM_EMAIL"
+  |> Option.value
+       ~default:"Learn-OCaml <learnocaml@backend.localdomain>"
+       (* TODO Extract domain name from LEARNOCAML_BASE_URL *)
+
+open Letters
+
+(* # with_starttls vs. smtp_port *)
+let conf_letters =
+  match smtp_server, smtp_auth_user, smtp_auth_passwd with
+  | Some server, Some user, Some passwd ->
+     Some (Config.create ~username:user ~password:passwd ~hostname:server ~with_starttls:false ())
+  | Some server, _, _ ->
+     Some (Config.create ~username:"" ~password:"" ~hostname:server ~with_starttls:false ())
+  | None, _, _ ->
+     None
 
 (* XXX The following format strings must not contain unsafe HTML chars
    ('<', '>', '"', '&'), as they are not escaped *)
@@ -85,15 +112,18 @@ The Learn-OCaml server.|}
 (***************************************************************)
 (* Now the following helper strings & functions deal with HTML *)
 
-let encode_html_utf8 =
+(* TODO Checkout Netencoding spec, find-out implem *)
+let encode_html_utf8 s = s
+(*
+  let encode_html_utf8 =
   Netencoding.Html.encode
-    ~in_enc:`Enc_utf8
-    ~out_enc:`Enc_utf8
-    ~prefer_name:true
-    ~unsafe_chars:Netencoding.Html.unsafe_chars_html4 ()
+  ~in_enc:`Enc_utf8
+  ~out_enc:`Enc_utf8
+  ~prefer_name:true
+  ~unsafe_chars:Netencoding.Html.unsafe_chars_html4 ()
 
-(* If need be
-let encode_url = Netencoding.Url.encode ~plus:false *)
+  let encode_url = Netencoding.Url.encode ~plus:false
+ *)
 
 let link_format : (string -> string -> string, unit, string) format =
   {|<a href="%s">%s</a>|}
@@ -116,7 +146,6 @@ let wrap_html ~title text =
   Printf.sprintf html_format ((*encode_html_utf8*) title) lines
 
 let send_email
-      ?(from_name="Learn-OCaml")
       ~(nick : string option) ~to_addr ~subject
       ?(hello=hello) ?(pretext="") ~text ?(posttext=closing) url =
   let padding, nickname =
@@ -127,41 +156,39 @@ let send_email
                   ^ pretext
                   ^ Printf.sprintf text url
                   ^ posttext in
-  match smtp_enabled_returnpath_email with
-  | Some returnpath_email ->
+  match conf_letters with
+  | Some conf ->
      let str_html =
        wrap_html ~title:subject
          (Printf.sprintf hello (padding ^ nickname)
           ^ pretext
           ^ Printf.sprintf text (wrap_url url)
           ^ posttext) in
-     let charset = ["charset", Netmime_string.mk_param "utf-8"] in
-     let body =
-       (wrap_parts
-          ~content_type:("multipart/alternative", [])
-          [ wrap_attachment
-              ~content_type: ("text/plain", charset)
-              (new Netmime.memory_mime_body str_plain);
-            wrap_attachment
-              ~content_type: ("text/html", charset)
-              (new Netmime.memory_mime_body str_html)
-       ]) in
-     let mail = wrap_mail
-                  (* XXX as Netsendmail doesn't support Reply-To, we use From *)
-                  ~from_addr: (from_name, returnpath_email)
-                  ~to_addrs: [(nickname, to_addr)]
-                  ~subject
-                  body in
-     sendmail ~mailer ~crlf:false mail;
-     Printf.printf {|[INFO] mailto:%s?subject="%s"
-%!|} to_addr subject
-  | None ->
-     Printf.printf {|[WARNING] Environment variables SMTPSERVER and EMAIL must be set! (*
+     let sender = smtp_from_email in
+     let recipients = [ To to_addr; ] in
+     let text = str_plain in
+     let html = str_html in
+     let email = create_email ~reply_to: sender ~from:sender ~recipients ~subject ~body:(Mixed (text, html, None)) () in
+     begin match email with
+     | Ok message ->
+        Printf.printf {|[INFO] mailto:%s?subject="%s"
+                       %!|} to_addr subject;
+        send ~config:conf ~sender ~recipients ~message
+     | Error err ->
+        Printf.printf {|[ERROR] %s (*
 Can't mailto:%s?subject="%s" with body """
 %s
 """ *)
-%!|} to_addr subject str_plain
+%!|} err to_addr subject str_plain; Lwt.return_unit
+     end
+  | None -> Printf.printf {|[WARNING] Environment variables LEARNOCAML_SMTP_SERVER and LEARNOCAML_SMTP_FROM_EMAIL must be set! (*
+Can't mailto:%s?subject="%s" with body """
+%s
+""" *)
+%!|} to_addr subject str_plain; Lwt.return_unit
 
+(* let charset = ["charset", Netmime_string.mk_param "utf-8"] in *)
+(* XXX as Netsendmail doesn't support Reply-To, we use From *)
 (* If need be
 let check_email email =
   try match Netaddress.parse email with
@@ -171,6 +198,27 @@ let check_email email =
   | Netaddress.Parse_error (_i, str) -> invalid_arg ("check_email: " ^ str)
  *)
 
+(* Sendmail_lwt/Colombe:
+   (* let domain_of_string str =
+   match Domain_name.of_string str with
+   | Ok raw_domain ->
+   (match Domain_name.host raw_domain with
+   | Ok domain -> domain
+   | Error (`Msg error) -> (*XX*)failwith error)
+   | Error (`Msg error) -> (*XX*)failwith error in
+   let dest = domain_of_string ((*XX*)Option.get smtp_server) in
+   let from_domain = domain_of_string ((*XX*)Option.get from_domain) in
+
+   (* XXX replace send_mail with submit
+   when replacing maildev with external SMTP using port 465 *)
+   Sendmail_lwt.sendmail ~destination:(`Domain_name dest) ~port:1025 ~domain:(Colombe.Domain.Domain ["backend"; "localdomain"])
+   (Colombe.Reverse_path (Some (Colombe.Path. ?)
+   Colombe.Forward_path; *)
+   sendmail ~mailer ~crlf:false mail;
+ *)
+
+open Lwt.Infix
+
 let confirm_email ~(nick:string option) ~(url:string) to_addr =
   send_email ~nick ~to_addr ~subject:confirm_subject
     ~text:confirm url
@@ -179,7 +227,7 @@ let change_email ~(nick:string option) ~(url:string) old_email new_email =
   send_email ~nick ~to_addr:new_email
     ~subject:change_new_subject
     ~pretext:(Printf.sprintf change_common old_email new_email)
-    ~text:change_new url;
+    ~text:change_new url >>= fun () ->
   send_email ~nick ~to_addr:old_email
     ~subject:change_old_subject
     ~pretext:(Printf.sprintf change_common old_email new_email)

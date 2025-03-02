@@ -48,7 +48,7 @@ ENTRYPOINT ["dumb-init","/usr/bin/learn-ocaml-client"]
 FROM alpine:3.20 as program
 
 RUN apk update \
-  && apk add ncurses-libs libev gmp dumb-init msmtp git openssl lsof \
+  && apk add ncurses-libs libev gmp dumb-init git openssl lsof \
   && addgroup learn-ocaml \
   && adduser learn-ocaml -DG learn-ocaml
 

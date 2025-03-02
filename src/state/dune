@@ -41,7 +41,7 @@
  (name token_index)
  (wrapped false)
  (modules Token_index)
- (libraries base64 lwt lwt.unix lwt_utils learnocaml_api learnocaml_data cryptokit netstring safepass irmin irmin-git)
+ (libraries base64 lwt lwt.unix lwt_utils learnocaml_api learnocaml_data cryptokit safepass irmin irmin-git)
 )
 
 (library

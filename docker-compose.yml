@@ -23,18 +23,15 @@ services:
     ports:
       - '8080:8080'
     environment:
-      # (ocaml variable) root URL:
       LEARNOCAML_BASE_URL: "http://localhost:8080"
-      # (ocaml variable) <container_name>.<network_name>:
-      FROM_DOMAIN: "backend.localdomain"
-      # (alpine msmtp variable) hostname of the SMTP server:
-      SMTPSERVER: "maildev"
-      # SMTPSERVER: "postfix"
-      # (ocaml + alpine msmtp variable) Reply-To = Return-Path:
-      EMAIL: "noreply@example.com"
+      # Reply-To = Return-Path: ...@<container_name>.<network_name>:
+      LEARNOCAML_SMTP_FROM_EMAIL: "Learn-OCaml <learnocaml@backend.localdomain>"
+      LEARNOCAML_SMTP_SERVER: "maildev"
+      # LEARNOCAML_SMTP_AUTH_USER: "?"
+      # LEARNOCAML_SMTP_AUTH_PASSWD: "?"
+      # LEARNOCAML_SMTP_PORT: "?"
     depends_on:
       - maildev
-      # - postfix
     volumes:
       - ./demo-repository:/repository:ro
       - ./sync:/sync

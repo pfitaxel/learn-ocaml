@@ -8,12 +8,12 @@
 
 (** [confim_email ~nick ~url addr] will send an email to confirm that
     the user indeed owns this email address, e.g., at account creation. *)
-val confirm_email: nick:string option -> url:string -> string -> unit
+val confirm_email: nick:string option -> url:string -> string -> unit Lwt.t
 
 (** [change_email ~nick ~url old new] will send 2 emails, so (1) the
     user can confirm to indeed own the new email address and (2) the
     old email account also receives a message for informative purposes. *)
-val change_email: nick:string option -> url:string -> string -> string -> unit
+val change_email: nick:string option -> url:string -> string -> string -> unit Lwt.t
 
 (** [reset_password ~nick ~url addr] helps users change their password. *)
-val reset_password: nick:string option -> url:string -> string -> unit
+val reset_password: nick:string option -> url:string -> string -> unit Lwt.t
