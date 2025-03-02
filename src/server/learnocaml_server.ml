@@ -1152,13 +1152,56 @@ let last_modified = (* server startup time *)
     (tm.tm_year + 1900)
     tm.tm_hour tm.tm_min tm.tm_sec
 
-(* Taken from the source of "decompress", from bin/easy.ml *)
+(* Taken from the source of "decompress.1.5.3", from bin/decompress.ml *)
 let compress ?(level = 4) data =
-  let input_buffer = Bytes.create 0xFFFF in
-  let output_buffer = Bytes.create 0xFFFF in
 
-  let pos = ref 0 in
-  let res = Buffer.create (String.length data) in
+  let bigstring_input ic buf off len =
+    let tmp = Bytes.create len in
+    try
+      let len = input ic tmp 0 len in
+      for i = 0 to len - 1 do
+        buf.{off + i} <- Bytes.get tmp i
+      done
+      ; len
+    with End_of_file -> 0 in
+
+  let bigstring_output oc buf off len =
+    let res = Bytes.create len in
+    for i = 0 to len - 1 do
+      Bytes.set res i buf.{off + i}
+    done
+    ; output_string oc (Bytes.unsafe_to_string res) in
+
+let w = De.make_window ~bits:15
+let l = De.Lz77.make_window ~bits:15
+let o = De.bigstring_create De.io_buffer_size
+let i = De.bigstring_create De.io_buffer_size
+let q = De.Queue.create 4096
+let str fmt = Format.asprintf fmt
+let msgf fmt = Format.kasprintf (fun msg -> `Msg msg) fmt
+let error_msgf fmt = Format.kasprintf (fun err -> Error (`Msg err)) fmt
+
+  
+let run_zlib_deflate ~level ic oc =
+  let open Decompress.Zl in
+  let encoder = Def.encoder `Manual `Manual ~q ~w:l ~level in
+
+  let rec go encoder =
+    match Def.encode encoder with
+    | `Await encoder ->
+      let len = bigstring_input ic i 0 De.io_buffer_size in
+      Def.src encoder i 0 len |> go
+    | `Flush encoder ->
+      let len = De.io_buffer_size - Def.dst_rem encoder in
+      bigstring_output oc o 0 len
+      ; Def.dst encoder o 0 De.io_buffer_size |> go
+    | `End encoder ->
+      let len = De.io_buffer_size - Def.dst_rem encoder in
+      if len > 0 then bigstring_output oc o 0 len
+      ; `Ok 0 in
+  Def.dst encoder o 0 De.io_buffer_size |> go
+
+
 
   Lwt_preemptive.detach
     (Decompress.Zlib_deflate.bytes
