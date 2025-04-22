@@ -42,10 +42,10 @@ main() {
     local BeyondOauthMoodleDev="$4"
     # todo: type verifications
     if [ -z "$BeyondOauthMoodleDev" ]; then
-        git_blame_wrapper "$File" "$LineBeg" "$LineEnd" | grep $( printf -- '-e %s ' $(oauth_moodle_dev_authors) ) | tee /dev/stderr | { sleep 0.05s; echo; sed -e 's/^ *[0-9]\+ /Co-authored-by: /' ; }
+        git_blame_wrapper "$File" "$LineBeg" "$LineEnd" | grep $( printf -- '-e %s ' $(oauth_moodle_dev_authors) ) | tee /dev/stderr | { sleep 0.05; echo; sed -e 's/^ *[0-9][0-9]* /Co-authored-by: /' ; }
 
     else
-        git_blame_wrapper "$File" "$LineBeg" "$LineEnd" | tee /dev/stderr | { sleep 0.05s; echo; sed -e 's/^ *[0-9]\+ /Co-authored-by: /' ; }
+        git_blame_wrapper "$File" "$LineBeg" "$LineEnd" | tee /dev/stderr | { sleep 0.05; echo; sed -e 's/^ *[0-9][0-9]* /Co-authored-by: /' ; }
     fi
 }
 
