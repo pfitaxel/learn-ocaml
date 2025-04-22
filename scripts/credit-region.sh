@@ -27,9 +27,18 @@ git_blame_wrapper() {
 # todo: setup in .mailmap: # git log --pretty='tformat:%an <%ae>' | sort -u
 
 oauth_moodle_dev_authors() {
-    local testMode=false
-    if [ "$testMode" = 'true' ]; then
-        echo alban.gruin@univ-tlse3.fr
+    local hardcodedMode=true
+    if [ "$hardcodedMode" = 'true' ]; then
+# todo: keep this list up-to-date, until oauth-moodle-dev feats live in master!
+        cat <<EOF
+erik@martin-dorel.org
+45235251+Aleridia@users.noreply.github.com
+6310153+agrn@users.noreply.github.com
+leo.segond@master-developpement-logiciel.fr
+louis.ayroles@master-developpement-logiciel.fr
+nassim.mourabit@master-developpement-logiciel.fr
+77079482+Plictox@users.noreply.github.com
+EOF
     else
         git log --pretty='tformat:%aE' 2847c36d34f342d919272b9e0885a900166c6aec^..oauth-moodle-dev | sort -u
     fi
