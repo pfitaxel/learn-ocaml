@@ -86,8 +86,11 @@ To be used as a `make-process' sentinel, using args PROC and STRING."
                       stderr
                       (lambda (std err)
                         (kill-new std)
-                        (message "Co-authored-by: ... copied to the clipboard!\nStats%s:\n%s"
-                                 (if raw "" " for oauth-moodle-dev") err))
+                        (message "Co-authored-by: ... %s\nStats%s (%s):\n%s"
+                                 "copied to clipboard; paste it in Magit!"
+                                 (if raw "" " for oauth-moodle-dev")
+                                 "press \"C-h e\" to enlarge view"
+                                 err))
                       (lambda (std err) (message-box "ERROR: %s\nOutput (if any): %s" err std)))))
       (message "Operation cancelled."))))
 
