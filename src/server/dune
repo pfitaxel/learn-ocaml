@@ -12,6 +12,7 @@
             sha
             checkseum.c
             decompress.de
+            decompress.zl
             learnocaml_report
             learnocaml_data
             learnocaml_api

@@ -1,6 +1,15 @@
 opam-version: "2.0"
 name: "learn-ocaml"
 version: "1.1.0"
+synopsis: "The learn-ocaml online platform (engine)"
+description: """\
+This contains the binaries forming the engine for the learn-ocaml platform, and
+the common files. A demo exercise repository is also provided as example."""
+maintainer: [
+  "Érik Martin-Dorel <erik.martin-dorel@irit.fr>"
+  "Yann Régis-Gianas <yann.regis-gianas@nomadic-labs.com>"
+  "Louis Gesbert <louis.gesbert@ocamlpro.com>"
+]
 authors: [
   "Benjamin Canou (OCamlPro)"
   "Çağdaş Bozman (OCamlPro)"
@@ -8,20 +17,14 @@ authors: [
   "Louis Gesbert (OCamlPro)"
   "Pierrick Couderc (OCamlPro)"
 ]
-maintainer: [
-  "Érik Martin-Dorel <erik.martin-dorel@irit.fr>"
-  "Yann Régis-Gianas <yann.regis-gianas@nomadic-labs.com>"
-  "Louis Gesbert <louis.gesbert@ocamlpro.com>"
-]
 license: "MIT"
 homepage: "https://github.com/ocaml-sf/learn-ocaml"
 bug-reports: "https://github.com/ocaml-sf/learn-ocaml/issues"
-dev-repo: "git+https://github.com/ocaml-sf/learn-ocaml"
 depends: [
   "angstrom" {= "0.15.0"}
   "arp" {= "3.1.1"}
   "asak" {= "0.5"}
-  "asn1-combinators" {= "0.3.1"}
+  "asn1-combinators" {= "0.3.2"}
   "astring" {= "0.8.5"}
   "awa" {= "0.4.0"}
   "awa-mirage" {= "0.4.0"}
@@ -35,24 +38,21 @@ depends: [
   "base64" {= "3.5.0"}
   "bheap" {= "2.0.0"}
   "bigarray-compat" {= "1.1.0"}
-  "bigarray-overlap" {= "0.2.1"}
-  "bigstringaf" {= "0.9.0"}
+  "bigstringaf" {= "0.10.0"}
   "bos" {= "0.2.1"}
   "ca-certs" {= "1.0.0"}
-  "ca-certs-nss" {= "3.101-1"}
+  "ca-certs-nss" {= "3.107"}
   "camlp-streams" {= "5.0.1"}
   "carton" {= "0.7.2"}
   "carton-git" {= "0.7.2"}
   "carton-lwt" {= "0.7.2"}
-  "cf" {= "0.4"}
-  "cf-lwt" {= "0.4"}
-  "checkseum" {= "0.3.4"}
-  "cmdliner" {= "1.2.0"}
-  "cohttp" {= "5.0.0"}
-  "cohttp-lwt" {= "5.0.0"}
-  "cohttp-lwt-unix" {= "5.0.0"}
-  "coin" {= "0.1.4"}
-  "colombe" {= "0.11.0"}
+  "cf" {= "0.5.0"}
+  "cf-lwt" {= "0.5.0"}
+  "checkseum" {= "0.5.2"}
+  "cmdliner" {= "1.3.0"}
+  "cohttp" {= "5.3.1"}
+  "cohttp-lwt" {= "5.3.0"}
+  "cohttp-lwt-unix" {= "5.3.0"}
   "conduit" {= "7.0.0"}
   "conduit-lwt" {= "7.0.0"}
   "conduit-lwt-unix" {= "7.0.0"}
@@ -72,16 +72,17 @@ depends: [
   "cstruct" {= "6.2.0"}
   "cstruct-lwt" {= "6.2.0"}
   "cstruct-unix" {= "6.2.0"}
-  "ctypes" {= "0.21.1"}
-  "ctypes-foreign" {= "0.4.0"}
-  "decompress" {= "1.5.0"}
+  "ctypes" {= "0.23.0"}
+  "ctypes-foreign" {= "0.23.0"}
+  "decompress" {= "1.5.3"}
   "digestif" {= "1.2.0"}
   "dns" {= "9.1.0"}
   "dns-client" {= "9.1.0"}
+  "dns-client-mirage" {= "9.1.0"}
   "domain-name" {= "0.4.0"}
   "duff" {= "0.5"}
   "dune" {= "3.16.0"}
-  "dune-configurator" {= "2.9.3"}
+  "dune-configurator" {= "3.17.2"}
   "duration" {= "0.2.1"}
   "easy-format" {= "1.3.4"}
   "either" {= "1.0.0"}
@@ -102,16 +103,16 @@ depends: [
   "git-paf" {= "3.17.0"}
   "git-unix" {= "3.17.0"}
   "gmap" {= "0.3.0"}
-  "h2" {= "0.10.0"}
-  "happy-eyeballs" {= "1.1.0"}
-  "happy-eyeballs-lwt" {= "1.1.0"}
-  "happy-eyeballs-mirage" {= "1.1.0"}
+  "h2" {= "0.13.0"}
+  "happy-eyeballs" {= "1.2.2"}
+  "happy-eyeballs-lwt" {= "1.2.2"}
+  "happy-eyeballs-mirage" {= "1.2.2"}
   "hex" {= "1.4.0"}
-  "hpack" {= "0.1.0"}
+  "hpack" {= "0.13.0"}
   "httpaf" {= "0.7.1"}
+  "httpun-types" {= "0.2.0"}
   "hxd" {= "0.3.3"}
-  "inotify" {= "2.4.1"}
-  "integers" {= "0.6.0"}
+  "integers" {= "0.7.0"}
   "ipaddr" {= "5.6.0"}
   "ipaddr-cstruct" {= "5.6.0"}
   "ipaddr-sexp" {= "5.6.0"}
@@ -131,11 +132,10 @@ depends: [
   "jst-config" {= "v0.16.0"}
   "kdf" {= "1.0.0"}
   "ke" {= "0.6"}
-  "letters" {= "0.4.0"}
   "logs" {= "0.7.0"}
   "lru" {= "0.3.1"}
   "lwt" {= "5.7.0"}
-  "lwt-dllist" {= "1.0.0"}
+  "lwt-dllist" {= "1.0.1"}
   "lwt_log" {= "1.1.2"}
   "lwt_react" {= "1.1.5"}
   "lwt_ssl" {= "1.1.3"}
@@ -149,23 +149,21 @@ depends: [
   "menhirLib" {= "20231231"}
   "menhirSdk" {= "20231231"}
   "metrics" {= "0.4.1"}
-  "mimic" {= "0.0.8"}
-  "mimic-happy-eyeballs" {= "0.0.8"}
+  "mimic" {= "0.0.9"}
+  "mimic-happy-eyeballs" {= "0.0.9"}
   "mirage-clock" {= "4.2.0"}
   "mirage-clock-unix" {= "4.2.0"}
-  "mirage-crypto" {= "1.2.0"}
-  "mirage-crypto-ec" {= "1.2.0"}
-  "mirage-crypto-pk" {= "1.2.0"}
-  "mirage-crypto-rng" {= "1.2.0"}
-  "mirage-crypto-rng-mirage" {= "1.2.0"}
-  "mirage-flow" {= "4.0.0"}
-  "mirage-kv" {= "6.0.1"}
+  "mirage-crypto" {= "1.1.0"}
+  "mirage-crypto-ec" {= "1.1.0"}
+  "mirage-crypto-pk" {= "1.1.0"}
+  "mirage-crypto-rng" {= "1.1.0"}
+  "mirage-crypto-rng-mirage" {= "1.1.0"}
+  "mirage-flow" {= "4.0.2"}
+  "mirage-kv" {= "6.1.1"}
   "mirage-net" {= "4.0.0"}
-  "mirage-ptime" {= "5.0.0"}
-  "mirage-runtime" {= "4.5.0"}
-  "mirage-time" {= "2.0.1"}
+  "mirage-runtime" {= "4.8.2"}
+  "mirage-time" {= "3.0.0"}
   "mirage-unix" {= "5.0.1"}
-  "mrmime" {= "0.6.1"}
   "mtime" {= "2.1.0"}
   "num" {= "1.4"}
   "ocaml" {= "5.1.1"}
@@ -175,7 +173,7 @@ depends: [
   "ocaml-syntax-shims" {= "1.0.0"}
   "ocamlbuild" {= "0.14.3"}
   "ocamlfind" {= "1.9.6"}
-  "ocamlgraph" {= "2.0.0"}
+  "ocamlgraph" {= "2.1.0"}
   "ocp-indent-nlfork" {= "1.5.5"}
   "ocp-ocamlres" {= "0.4"}
   "ocplib-endian" {= "1.2"}
@@ -183,7 +181,7 @@ depends: [
   "odoc-parser" {= "2.4.2"}
   "ohex" {= "0.2.0"}
   "omd" {= "1.3.2"}
-  "optint" {= "0.2.0"}
+  "optint" {= "0.3.0"}
   "paf" {= "0.7.0"}
   "parsexp" {= "v0.16.0"}
   "pecu" {= "0.7"}
@@ -194,7 +192,7 @@ depends: [
   "ppx_compare" {= "v0.16.0"}
   "ppx_cstruct" {= "6.2.0"}
   "ppx_derivers" {= "1.2.1"}
-  "ppx_deriving" {= "6.0.2"}
+  "ppx_deriving" {= "6.0.3"}
   "ppx_enumerate" {= "v0.16.0"}
   "ppx_expect" {= "v0.16.0"}
   "ppx_globalize" {= "v0.16.0"}
@@ -206,7 +204,6 @@ depends: [
   "ppx_repr" {= "0.7.0"}
   "ppx_sexp_conv" {= "v0.16.0"}
   "ppxlib" {= "0.32.1"}
-  "prettym" {= "0.0.3"}
   "psq" {= "0.2.1"}
   "ptime" {= "1.1.0"}
   "randomconv" {= "0.2.0"}
@@ -229,9 +226,8 @@ depends: [
   "stringext" {= "1.6.0"}
   "tcpip" {= "8.2.0"}
   "time_now" {= "v0.16.0"}
-  "tls" {= "2.0.0"}
-  "tls-lwt" {= "2.0.0"}
-  "tls-mirage" {= "2.0.0"}
+  "tls" {= "1.0.4"}
+  "tls-mirage" {= "1.0.4"}
   "topkg" {= "1.0.7"}
   "tyxml" {= "4.6.0"}
   "uchar" {= "0.0.2"}
@@ -241,7 +237,7 @@ depends: [
   "uutf" {= "1.0.3"}
   "uuuu" {= "0.3.0"}
   "vg" {= "0.9.4"}
-  "x509" {= "1.0.4"}
+  "x509" {= "1.0.5"}
   "yojson" {= "2.2.2"}
   "yuscii" {= "0.3.0"}
   "zarith" {= "1.13"}
@@ -250,18 +246,10 @@ build: [
   [make "static"]
   ["dune" "build" "-p" name "-j" jobs]
 ]
+run-test: [make "test"]
 install: [
   ["mkdir" "-p" "%{_:share}%"]
   ["cp" "-r" "demo-repository" "%{_:share}%/repository"]
 ]
-synopsis: "The learn-ocaml online platform (engine)"
-description: """
-This contains the binaries forming the engine for the learn-ocaml platform, and
-the common files. A demo exercise repository is also provided as example.
-"""
-run-test: [make "test"]
 depexts: ["lsof"] {os-distribution = "alpine"}
-pin-depends: [
-  "irmin-git.3.10.0"
-  "https://github.com/mirage/irmin/releases/download/3.10.0/irmin-3.10.0.tbz"
-]
+dev-repo: "git+https://github.com/ocaml-sf/learn-ocaml"
