@@ -1,4 +1,4 @@
 {
     "use_passwd": true,
-    "use_moodle": false
+    "use_moodle": true
 }
