@@ -49,7 +49,7 @@ module El = struct
   module Login_overlay = struct
     let login_overlay_id, login_overlay = id "login-overlay"
     let login_new_token_id, login_new_token = id "login-new-token"
-    let login_new_id, login_new = id "login-new"
+    let login_new_passwd_id, login_new_passwd = id "login-new-passwd"
     let login_returning_id, login_returning = id "login-returning"
 
     let token_nickname_id, token_nickname = id "token-nickname-input"
@@ -830,7 +830,7 @@ let init_token_dialog () =
     Manip.SetCss.display login_new_token "none"
   else
     begin
-      Manip.SetCss.display login_new "none";
+      Manip.SetCss.display login_new_passwd "none";
       Manip.SetCss.display login_returning "none"
     end;
   let get_token, got_token = Lwt.task () in

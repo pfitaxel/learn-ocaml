@@ -1014,7 +1014,7 @@ div#login-overlay > h1 {
     text-align: center;
     margin-bottom: 50px;
 }
-#login-new-token, #login-new, #login-returning, #login-token, #login-direct {
+#login-new-token, #login-new-passwd, #login-returning, #login-token, #login-direct {
     margin: 30px auto;
     background-color: #666;
     border-radius: 3px;
@@ -1030,7 +1030,7 @@ div#login-overlay > h1 {
     display: none;
 }
 @media (min-width: 1000px) {
-    #login-new-token, #login-new, #login-returning, #login-token, #login-direct {
+    #login-new-token, #login-new-passwd, #login-returning, #login-token, #login-direct {
         width: 30vw;
     }
 }
@@ -1045,7 +1045,7 @@ div#login-overlay > h1 {
     color: black;
     border-radius: 3px 3px 0 0;
 }
-#login-new-token > div, #login-new > div, #login-returning > div, #login-token > div, #login-direct > div {
+#login-new-token > div, #login-new-passwd > div, #login-returning > div, #login-token > div, #login-direct > div {
 #login-overlay a {
     display: block;
     margin-left: auto;
@@ -1059,7 +1059,7 @@ div#login-overlay > h1 {
     display: flex;
     flex-direction: row;
 }
-#login-new-token > dir > div, #login-new > div > div, #login-returning > div > div, #login-token > div > div, #login-direct > div > div {
+#login-new-token > dir > div, #login-new-passwd > div > div, #login-returning > div > div, #login-token > div > div, #login-direct > div > div {
   line-height: 30px;
 }
 div#login-overlay input {
