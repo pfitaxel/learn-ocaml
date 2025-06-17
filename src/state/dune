@@ -10,7 +10,6 @@
  (modules Learnocaml_data)
  (libraries asak
             sha
-            cryptokit
             unix
             learnocaml_toplevel_history
             learnocaml_report
