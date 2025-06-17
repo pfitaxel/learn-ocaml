@@ -14,7 +14,6 @@ open Lwt
 open Learnocaml_data
 open Learnocaml_common
 open Learnocaml_config
-open Token_index
 
 module H = Tyxml_js.Html5
 
