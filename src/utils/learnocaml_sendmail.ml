@@ -22,6 +22,8 @@
   EMAIL: "noreply@example.com"
  *)
 
+(* EMD: COMMENTED-OUT FOR THE TIME BEING:
+
 let smtp_server =
   Sys.getenv_opt "LEARNOCAML_SMTP_SERVER"
 
@@ -236,3 +238,4 @@ let change_email ~(nick:string option) ~(url:string) old_email new_email =
 let reset_password ~(nick:string option) ~(url:string) to_addr =
   send_email ~nick ~to_addr ~subject:reset_subject
     ~text:reset url
+ *)

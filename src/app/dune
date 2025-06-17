@@ -39,7 +39,8 @@
             learnocaml_app_common
             learnocaml_toplevel
             js_of_ocaml-ppx
-            ocplib_i18n)
+            ocplib_i18n
+	    token_index)
  (modules Learnocaml_teacher_tab_doc
           Learnocaml_teacher_tab
           Learnocaml_index_main)

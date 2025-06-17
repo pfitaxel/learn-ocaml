@@ -227,6 +227,7 @@ module Token = struct
 
   let teacher_token_prefix = "X"
 
+  let to_list t = t
   let to_string = String.concat "-"
   let to_path = String.concat (Filename.dir_sep)
   let teacher_tokens_path = teacher_token_prefix

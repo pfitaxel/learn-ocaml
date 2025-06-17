@@ -94,6 +94,7 @@ module Token: sig
 
   val enc: t Json_encoding.encoding
 
+  val to_list: t -> string list
   val to_path: t -> string
   val to_string: t -> string
   val parse: string -> t

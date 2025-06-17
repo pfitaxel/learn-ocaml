@@ -129,3 +129,16 @@ module UpgradeIndex: sig
   val filter_old_operations : string -> unit Lwt.t
   val abort_email_change : string -> Learnocaml_data.Token.t -> unit Lwt.t
 end
+
+(*
+(* REMOVE this alpha-quality code that is now superseded by PR #610 *)
+module NonceIndex: sig
+  (* val parse : [> `O of (string * [> `String of 'a ]) list ] -> 'a *)
+  (* val serialise : 'a -> [> `O of (string * [> `String of 'a ]) list ] *)
+  type store_path = string list
+  val create_entry : store_path -> string Lwt.t
+  val from_token : store_path -> string Lwt.t
+  val from_nonce : string -> store_path option list Lwt.t
+  val delete_entry : store_path -> unit Lwt.t
+end
+ *)

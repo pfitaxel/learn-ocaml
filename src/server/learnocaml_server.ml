@@ -236,9 +236,9 @@ let create_student conn (config: Learnocaml_data.Server.config) req
            Lwt.return (Token_index.Token (tok, use_moodle))
         | `Password (email, password) ->
            Token_index.UpgradeIndex.change_email !sync_dir tok >|= (fun handle ->
-            Learnocaml_sendmail.confirm_email
-              ~nick
-              ~url:(req.Api.host ^ "/confirm/" ^ handle)
+            Printf.eprintf "Learnocaml_sendmail.confirm_email %s %s %s\n%!"
+              (Option.value nick ~default:"")
+              (*~url:*) (req.Api.host ^ "/confirm/" ^ handle)
               email;
             Token_index.Password (tok, email, password, Some(email)))) >>= fun auth ->
        Token_index.UserIndex.add !sync_dir auth >>= fun () ->
@@ -257,18 +257,18 @@ let resend_confirmation_email token email req =
         | None -> Token_index.UpgradeIndex.change_email !sync_dir token
   end >>= fun handle ->
   get_nickname token >>= fun nick ->
-  Learnocaml_sendmail.confirm_email
-    ~nick
-    ~url:(req.Api.host ^ "/confirm/" ^ handle)
+  Printf.eprintf "Learnocaml_sendmail.confirm_email %s %s %s\n%!"
+    (Option.value nick ~default:"")
+    (*~url:*)(req.Api.host ^ "/confirm/" ^ handle)
     email;
   Lwt.return_unit
 
 let initiate_password_change token address cache req =
   Token_index.UpgradeIndex.reset_password !sync_dir token >>= fun handle ->
   get_nickname token >>= fun nick ->
-  Learnocaml_sendmail.reset_password
-    ~nick
-    ~url:(req.Api.host ^ "/reset_password/" ^ handle)
+  Printf.eprintf "Learnocaml_sendmail.reset_password %s %s %s\n%!"
+    (Option.value nick ~default:"")
+    (*~url:*) (req.Api.host ^ "/reset_password/" ^ handle)
     address;
   respond_json cache address
 
@@ -852,9 +852,9 @@ module Request_handler = struct
                  Token_index.UserIndex.change_email !sync_dir token address >>= fun () ->
                  Token_index.UpgradeIndex.change_email !sync_dir token >>= fun handle ->
                  get_nickname token >>= fun nick ->
-                 Learnocaml_sendmail.change_email
-                   ~nick
-                   ~url:(req.Api.host ^ "/confirm/" ^ handle)
+                 Printf.eprintf "Learnocaml_sendmail.change_email %s %s %s %s\n%!"
+                   (Option.value nick ~default:"")
+                   (*url:*)(req.Api.host ^ "/confirm/" ^ handle)
                    old_address address;
                  respond_json cache ()
             | None -> lwt_fail (`Not_found, "Unknown user."))
@@ -1031,9 +1031,9 @@ module Request_handler = struct
          Token_index.UserIndex.upgrade !sync_dir token email password >>= fun () ->
          Token_index.UpgradeIndex.change_email !sync_dir token >>= fun handle ->
          get_nickname token >>= fun nick ->
-         Learnocaml_sendmail.confirm_email
-           ~nick
-           ~url:(req.Api.host ^ "/confirm/" ^ handle)
+         Printf.printf "Learnocaml_sendmail.confirm_email %s %s %s \n%!"
+           (Option.value nick ~default:"")
+           (*~url:*)(req.Api.host ^ "/confirm/" ^ handle)
            email;
          lwt_ok @@ Redirect { code=`See_other; url="/"; cookies }
       | Api.Upgrade_form _ ->

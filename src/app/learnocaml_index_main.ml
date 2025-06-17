@@ -14,7 +14,7 @@ open Lwt
 open Learnocaml_data
 open Learnocaml_common
 open Learnocaml_config
-open Token_Index
+open Token_index
 
 module H = Tyxml_js.Html5
 
@@ -850,11 +850,9 @@ let init_token_dialog () =
          retrieve
            (Learnocaml_api.Create_token (secret, None, Some nickname))
          >>= fun token ->
-         NonceIndex.create_entry token;
-         let nonce = NonceIndex.from_token token in
-         Learnocaml_local_storage.(store sync_token) nonce;
+         Learnocaml_local_storage.(store sync_token) token;
          Learnocaml_local_storage.(store can_show_token) true;
-         show_token_dialog nonce
+         show_token_dialog token
          >>= fun () ->
          Lwt.return_some (nonce, nickname))
     else
@@ -907,6 +905,7 @@ let init_token_dialog () =
                 [%i"The password and its confirmation are not the same"]
                 (fun () -> Manip.focus reg_input_confirmation)
             end;
+          (* EMD: this is awkward, cf. the type of create_token *)
           Lwt.return_none
         end
       else
@@ -922,8 +921,10 @@ let init_token_dialog () =
          cb_alert ~title:[%i"VALIDATION REQUIRED"]
            [%i"A confirmation e-mail has been sent to your address."]
            Js_utils.reload;
+         (* EMD: this is awkward, cf. the type of create_token *)
          Lwt.return_none)
     else
+      (* EMD: this is awkward, cf. the type of create_token *)
       Lwt.return_none
   in
   let rec login_passwd () =
@@ -938,11 +939,10 @@ let init_token_dialog () =
       | Ok token ->
          Server_caller.request (Learnocaml_api.Fetch_save token) >>= function
          | Ok save ->
-            NonceIndex.create_entry token;
-            let nonce = NonceIndex.from_token token in
-            set_state_from_save_file ~token:nonce save;
+            set_state_from_save_file ~token save;
             Learnocaml_local_storage.(store can_show_token) false;
-            Lwt.return_some (nonce, save.Save.nickname)
+            (* EMD: FIXME this Token.to_string *)
+            Lwt.return_some (Token.to_string token, save.Save.nickname)
          | Error (`Not_found _) ->
             alert ~title:[%i"TOKEN NOT FOUND"]
               [%i"The entered token couldn't be recognized."];
@@ -977,11 +977,10 @@ let init_token_dialog () =
        | _ ->
           Server_caller.request (Learnocaml_api.Fetch_save token) >>= function
           | Ok save ->
-             NonceIndex.create_entry token;
-             let nonce = NonceIndex.from_token token in
-             set_state_from_save_file ~token:nonce save;
+             set_state_from_save_file ~token save;
              Learnocaml_local_storage.(store can_show_token) true;
-             Lwt.return_some (nonce, save.Save.nickname)
+            (* EMD: FIXME this Token.to_string *)
+             Lwt.return_some (Token.to_string token, save.Save.nickname)
           | Error (`Not_found _) ->
              alert ~title:[%i"TOKEN NOT FOUND"]
                [%i"The entered token couldn't be recognized."];
@@ -1014,7 +1013,7 @@ let init_token_dialog () =
   let handler f t = fun _ ->
     Lwt.async (fun () ->
         f () >|= function
-        | Some token -> Lwt.wakeup got_token token
+        | Some (pair_str) -> Lwt.wakeup got_token pair_str
         | None -> ());
     t
   in
@@ -1057,7 +1056,8 @@ let init_sync_token button_group =
         | None ->
            begin
              try Lwt.return Learnocaml_local_storage.(retrieve sync_token)
-             with Not_found -> init_token_dialog ()
+                               (* EMD: FIXME this Token.parse *)
+             with Not_found -> init_token_dialog () >|= Token.parse
            end
         | Some token ->
            let token = Learnocaml_data.Token.parse token in
@@ -1066,7 +1066,8 @@ let init_sync_token button_group =
               set_state_from_save_file ~token save;
               Learnocaml_local_storage.(store can_show_token) false;
               Lwt.return token
-           | Error _ -> init_token_dialog ()
+           (* EMD: FIXME this Token.parse *)
+           | Error _ -> init_token_dialog () >|= Token.parse
       end >>= fun token ->
       enable_button_group button_group;
       begin
@@ -1364,11 +1365,10 @@ let () =
       dialog_content
       (fun () ->
         Lwt.async @@ fun () ->
-         let nonce = Learnocaml_local_storage.(retrieve sync_token) in
          Learnocaml_local_storage.clear ();
          delete_cookie "token";
          reload ();
-         NonceIndex.delete_entry @@ NonceIndex.from_nonce nonce)
+         Lwt.return_unit)
   in
   List.iter (fun (text, icon, f) ->
       button ~container:El.sync_buttons ~theme:"white" ~group:sync_button_group ~icon text f)

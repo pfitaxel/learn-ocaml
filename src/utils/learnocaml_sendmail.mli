@@ -6,6 +6,8 @@
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
+(* EMD: COMMENTED-OUT FOR THE TIME BEING:
+
 (** [confim_email ~nick ~url addr] will send an email to confirm that
     the user indeed owns this email address, e.g., at account creation. *)
 val confirm_email: nick:string option -> url:string -> string -> unit Lwt.t
@@ -17,3 +19,4 @@ val change_email: nick:string option -> url:string -> string -> string -> unit L
 
 (** [reset_password ~nick ~url addr] helps users change their password. *)
 val reset_password: nick:string option -> url:string -> string -> unit Lwt.t
+ *)
