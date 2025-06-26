@@ -3,17 +3,15 @@
 # To deploy learn-ocaml, see e.g.:
 # https://github.com/pfitaxel/docker-learn-ocaml/blob/master/docker-compose.yml
 
-# NOTE: Regarding the very first run (sudo docker-compose up --build),
+# NOTE: Regarding the very first run (sudo docker compose up --build),
 # the setup of the moodle container ("INFO  ==> Running Moodle install script")
 # may take a long time (up to 18 minutes).
 # Once this is done ("INFO  ==> ** Moodle setup finished! **"),
-# you can browse http://localhost:9090/
+# you can browse http://localhost:9090/ and sign-in with ("user", "bitnami")
 #
 # DO NOT STOP the docker-compose app too early during the first run, otherwise,
 # the database would be in a broken state, leading to a systematic error at
 # further runs ("learn-ocaml-moodle-1 exited with code 1").
-
-version: '3.7'
 
 services:
   learnocaml:
@@ -30,8 +28,8 @@ services:
       # LEARNOCAML_SMTP_AUTH_USER: "?"
       # LEARNOCAML_SMTP_AUTH_PASSWD: "?"
       # LEARNOCAML_SMTP_PORT: "?"
-    depends_on:
-      - maildev
+    # depends_on:
+    #   - maildev
     volumes:
       - ./demo-repository:/repository:ro
       - ./sync:/sync
@@ -39,15 +37,15 @@ services:
       - learnocaml-net
     restart: unless-stopped
 
-  # Only useful for dev
-  maildev:
-    image: maildev/maildev
-    ports:
-      - "1080:1080"
-    environment:
-      MAILDEV_SMTP_PORT: 25
-    networks:
-      - learnocaml-net
+  # # Only useful for dev
+  # maildev:
+  #   image: maildev/maildev
+  #   ports:
+  #     - "1080:1080"
+  #   environment:
+  #     MAILDEV_SMTP_PORT: 25
+  #   networks:
+  #     - learnocaml-net
 
 # For a prod configuration, see also:
 # https://github.com/pfitaxel/docker-learn-ocaml/blob/master/docker-compose.yml
