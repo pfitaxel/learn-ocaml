@@ -1,0 +1,33 @@
+name: Test OPAM Publish
+# See also release.yml
+# and https://docs.github.com/en/actions/using-workflows/reusing-workflows#creating-a-reusable-workflow
+on:
+  # pull_request:
+  #   branches:
+  #     - "master"
+  push:
+    branches:
+      - "**-gha"
+      - "preflight"
+  # for testing (= PR base branch)
+  # for prod, see workflow Release
+
+jobs:
+  call-opam-publish:
+    uses: ./.github/workflows/opam-publish.yml
+    with:
+      # release: "false"  # beware: keep this flag set to false
+      tag_name: "v0.16.0" # beware: put here an existing (old) tag
+      body: |
+        Cc @erikmd
+
+        ## [1.0.0](https://github.com/ocaml-sf/learn-ocaml/compare/v0.16.0...v1.0.0) (2024-02-12)
+
+        Preflight!
+
+        ### Features
+        
+        * **pre-compilation:** Implement pre-compilation of exercises and graders ([b03bdfe](https://github.com/ocaml-sf/learn-ocaml/commit/b03bdfe5a7c9ed5d4677b1ee2eb11d37e953cbe3))
+        * etc.
+    secrets:
+      OPAM_RELEASE: ${{ secrets.OPAM_RELEASE }}

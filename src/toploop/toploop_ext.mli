@@ -1,27 +1,12 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
 
-type 'a toplevel_result = 'a Toploop_results.toplevel_result =
-  (* ('a * warning list, error * warning list) result = *)
-  | Ok of 'a * warning list
-  | Error of error * warning list
-
-and error = Toploop_results.error =
-  { msg: string;
-    locs: loc list;
-    if_highlight: string; }
-
-and warning = error
-
-and loc = Toploop_results.loc = {
-  loc_start: int * int;
-  loc_end: int * int;
-}
+include module type of Toploop_results
 
 (** Parse and typecheck a given source code.
 
@@ -106,9 +91,31 @@ val use_mod_string:
   ?sig_code:string ->
   string -> bool toplevel_result
 
+(** Registers the given cmi files contents into the running toplevel *)
+val load_cmi_from_string:
+  string -> unit
+
+(** Registers a global into the toplevel. Can be used to dynamically create
+    compilation units ([inject_global "Foo" (Obj.repr (module Foo))]). Does not
+    affect the environment (suppose a corresponding .cmi) *)
+val inject_global: string -> Obj.t -> unit
+
+(** Register a hook to be called after inject_global on the newly registered
+    ident. Useful for jsoo which has additional registrations required. *)
+val set_inject_global_hook: (Ident.t -> unit) -> unit
+
 (** Helpers to embed PPX into the toplevel. *)
 module Ppx : sig
   val preprocess_structure: Parsetree.structure -> Parsetree.structure
   val preprocess_signature: Parsetree.signature -> Parsetree.signature
   val preprocess_phrase: Parsetree.toplevel_phrase -> Parsetree.toplevel_phrase
 end
+
+module Printer : Genprintval.S with type t = Obj.t
+
+(** Used by our ppx *)
+val install_printer: string -> string -> string -> ('a -> 'b) -> unit
+
+(** Hook to be called after loading units so that the registered printers are
+    present also in the toplevel's built-in printer. *)
+val register_pending_printers: unit -> unit

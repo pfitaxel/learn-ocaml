@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -16,6 +16,10 @@ let (>>=) = Lwt.bind
 let is_success = function
   | Toploop_ext.Ok _ -> true
   | Toploop_ext.Error _ -> false
+
+let success_string = function
+  | Toploop_ext.Ok _ -> "OK"
+  | Toploop_ext.Error (((_, e),_),_) -> "Error: "^e
 
 type 'a return =
   | ReturnSuccess of 'a * Toploop_ext.warning list
@@ -35,7 +39,7 @@ let unwrap_result =
 
 module IntMap = Map.Make(struct
     type t = int
-    let compare (x:int) (y:int) = Pervasives.compare x y
+    let compare (x:int) (y:int) = compare x y
   end)
 
 (* Limit the frequency of sent messages to one per ms, using an active
@@ -54,12 +58,14 @@ module IntMap = Map.Make(struct
    does a big computation just after a bufferized write. And it would
    still need some kind of active waiting to limit throughput. All in
    all this spinwait is not that ugly. *)
-let last = ref 0.
-let rec wait () =
-  let now = Sys.time () (* let's hope this yields a bit *) in
-  if now -. !last > 0.001 then
-    last := now
-  else wait ()
+let wait =
+  let last = ref 0. in
+  let rec aux () =
+    let now = Sys.time () (* let's hope this yields a bit *) in
+    if now -. !last > 0.001 then last := now
+    else aux ()
+  in
+  aux
 
 let post_message (m: toploop_msg) =
   wait () ;
@@ -127,6 +133,15 @@ let make_answer_ppf fd_answer =
     (fun str -> check_first_call () ; orig_print_string str)
     (fun () -> check_first_call () ; orig_flush ())
 
+(* For callbacks that are part of Learnocaml_internal_intf.CALLBACKS and
+   expected to be registered in advance *)
+let print_html_callback = ref (fun _ -> ())
+let print_svg_callback = ref (fun _ -> ())
+let pre_registered_callbacks = [
+  "print_html", print_html_callback;
+  "print_svg", print_svg_callback;
+]
+
 (** Code compilation and execution *)
 
 (* TODO protect execution with a mutex! *)
@@ -155,8 +170,24 @@ let handler : type a. a host_msg -> a return Lwt.t = function
       let ppf_answer = make_answer_ppf fd_answer in
       if !debug then Js_utils.debug "Worker: -> Execute (%S)" code;
       let result = Toploop_ext.execute ?ppf_code ~print_outcome ~ppf_answer code in
-      if !debug then Js_utils.debug "Worker: <- Execute (%B)" (is_success result);
+      if !debug then
+        Js_utils.debug "Worker: <- Execute (%s)" (success_string result);
       iter_option close_fd fd_code;
+      close_fd fd_answer;
+      unwrap_result result
+  | Use_compiled_string (fd_answer, js_code) ->
+      let ppf_answer = make_answer_ppf fd_answer in
+      if !debug then
+        Js_utils.debug "Worker: -> Use_js_string (%S)" js_code;
+      let result =
+        try Toploop_jsoo.use_compiled_string js_code; Toploop_ext.Ok (true, [])
+        with exn ->
+          Firebug.console##log (Js.string (Printexc.to_string exn));
+          Format.fprintf ppf_answer "%s" (Printexc.to_string exn);
+          Toploop_ext.Ok (false, [])
+      in
+      if !debug then
+        Js_utils.debug "Worker: <- Use_js_string (%s)" (success_string result);
       close_fd fd_answer;
       unwrap_result result
   | Use_string (filename, print_outcome, fd_answer, code) ->
@@ -165,7 +196,7 @@ let handler : type a. a host_msg -> a return Lwt.t = function
         Js_utils.debug "Worker: -> Use_string (%S)" code;
       let result = Toploop_ext.use_string ?filename ~print_outcome ~ppf_answer code in
       if !debug then
-        Js_utils.debug "Worker: <- Use_string (%B)" (is_success result);
+        Js_utils.debug "Worker: <- Use_string (%s)" (success_string result);
       close_fd fd_answer;
       unwrap_result result
   | Use_mod_string (fd_answer, print_outcome, modname, sig_code, impl_code) ->
@@ -177,7 +208,7 @@ let handler : type a. a host_msg -> a return Lwt.t = function
           ~ppf_answer ~print_outcome ~modname ?sig_code impl_code in
       if !debug then
         Js_utils.debug
-          "Worker: <- Use_mod_string %s (%B)" modname (is_success result);
+          "Worker: <- Use_mod_string %s (%s)" modname (success_string result);
       close_fd fd_answer;
       unwrap_result result
   | Set_debug b ->
@@ -194,18 +225,23 @@ let handler : type a. a host_msg -> a return Lwt.t = function
             Ast_helper.(Typ.constr (Location.mknoloc (Longident.Lident "unit")) []) in
           { Parsetree.ptyp_desc = Parsetree.Ptyp_arrow (Asttypes.Nolabel, arg, ret) ;
             ptyp_loc = Location.none ;
-            ptyp_attributes = [] } in
+            ptyp_attributes = [];
+            ptyp_loc_stack = [] } in
         Typetexp.transl_type_scheme !Toploop.toplevel_env ast in
       Toploop.toplevel_env :=
         Env.add_value
-          (Ident.create name)
+          (Ident.create_local name)
           { Types.
+            val_uid = Types.Uid.mk ~current_unit:"Learnocaml_callback";
             val_type = ty.Typedtree.ctyp_type;
             val_kind = Types.Val_reg;
             val_attributes = [];
             val_loc = Location.none }
           !Toploop.toplevel_env ;
       Toploop.setvalue name (Obj.repr callback) ;
+      (match List.assoc_opt name pre_registered_callbacks with
+       | Some cbr -> cbr := callback
+       | None -> ());
       return_unit_success
   | Check code ->
       let saved = !Toploop.toplevel_env in
@@ -213,17 +249,22 @@ let handler : type a. a host_msg -> a return Lwt.t = function
       let result = Toploop_ext.check code in
       Toploop.toplevel_env := saved ;
       unwrap_result result
+  | Load_cmi_from_string cmi ->
+      Toploop_ext.load_cmi_from_string cmi;
+      return_unit_success
 
 let ty_of_host_msg : type t. t host_msg -> t msg_ty = function
   | Init -> Unit
   | Reset -> Unit
   | Execute _ -> Bool
   | Use_string _ -> Bool
+  | Use_compiled_string _ -> Bool
   | Use_mod_string _ -> Bool
   | Set_debug _ -> Unit
   | Check _ -> Unit
   | Set_checking_environment -> Unit
   | Register_callback _ -> Unit
+  | Load_cmi_from_string _ -> Unit
 
 let () =
   let handler (type t) data =
@@ -239,17 +280,48 @@ let () =
         post_message (ReturnError (id, res, w));
         Lwt.return_unit
   in
-  let path = "/worker_cmis" in
-  Sys_js.mount ~path
-    (fun ~prefix:_ ~path ->
-       match OCamlRes.Res.find (OCamlRes.Path.of_string path) Embedded_cmis.root with
-       | cmi ->
-           Js.Unsafe.set cmi (Js.string "t") 9 ; (* XXX hack *)
-           Some cmi
-       | exception Not_found -> None) ;
-  Config.load_path := [ path ] ;
-  Toploop_jsoo.initialize ();
-  Hashtbl.add Toploop.directive_table
+  (* the new toplevel uses directory listings to discover .cmis, so the old
+     approach of using [Sys_js.mount] for subpaths of individual files no longer
+     works: we need to mount everything explicitely. *)
+  let rec rec_mount path = function
+    | OCamlRes.Res.Dir (name, children) ->
+        List.iter (rec_mount (name::path)) children
+    | OCamlRes.Res.File (name, content) ->
+        let name = "/" ^ String.concat "/" (List.rev (name::path)) in
+        Sys_js.create_file ~name ~content
+    | OCamlRes.Res.Error _ -> ()
+  in
+  rec_mount [] (OCamlRes.Res.Dir ("worker_cmis", Embedded_cmis.root));
+  (try Toploop_jsoo.initialize ["/worker_cmis"] with
+   | Typetexp.Error (loc, env, error) ->
+       Js_utils.log "FAILED INIT %a at %a"
+         (Typetexp.report_error env) error
+         Location.print_loc loc
+   | e ->
+       Js_utils.log "FAILED INIT %s" (Printexc.to_string e));
+  Toploop.add_directive
     "debug_worker"
-    (Toploop.Directive_bool (fun b -> debug := b));
+    (Toploop.Directive_bool (fun b -> debug := b))
+    {Toploop.section="Learn-OCaml specific"; doc=""};
   Worker.set_onmessage (fun s -> Lwt.async (fun () -> handler s))
+
+(* Register some dynamic modules that are expected by compiled artifacts loaded
+   into the exercises. These have no cmi (hence are invisible to non-compiled
+   code) and are lightweight, so they should not affect the non-exercise
+   toplevels *)
+
+let () =
+  let module Learnocaml_callback: Learnocaml_internal_intf.CALLBACKS = struct
+    let print_html s = !print_html_callback s
+    let print_svg s = !print_svg_callback s
+  end in
+  Toploop_ext.inject_global "Learnocaml_callback"
+    (Obj.repr (module Learnocaml_callback: Learnocaml_internal_intf.CALLBACKS))
+
+let () =
+  let module Learnocaml_internal: Learnocaml_internal_intf.INTERNAL = struct
+    let install_printer = Toploop_ext.install_printer
+    exception Undefined
+  end in
+  Toploop_ext.inject_global "Learnocaml_internal"
+    (Obj.repr (module Learnocaml_internal: Learnocaml_internal_intf.INTERNAL))

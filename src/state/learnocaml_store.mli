@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -17,6 +17,8 @@ val static_dir: string ref
 val sync_dir: string ref
 
 (** {2 Utility server-side conversion functions} *)
+
+(** Used both for file i/o and request handling *)
 
 val get_from_file : 'a Json_encoding.encoding -> string -> 'a Lwt.t
 val write_to_file : 'a Json_encoding.encoding -> 'a -> string -> unit Lwt.t
@@ -36,7 +38,7 @@ module Lesson: sig
     val get: unit -> t Lwt.t
   end
 
-  include module type of struct include Lesson end with module Index := Index
+  include module type of struct include Lesson end with module Index := Lesson.Index
 
   val get: id -> t Lwt.t
 
@@ -49,7 +51,7 @@ module Playground: sig
     val get: unit -> t Lwt.t
   end
 
-  include module type of struct include Playground end with module Index := Index
+  include module type of struct include Playground end with module Index := Playground.Index
 
   val get: id -> t Lwt.t
 
@@ -66,7 +68,7 @@ module Tutorial: sig
     val get: unit -> t Lwt.t
   end
 
-  include module type of struct include Tutorial end with module Index := Index
+  include module type of struct include Tutorial end with module Index := Tutorial.Index
 
   val get: id -> t Lwt.t
 
@@ -98,9 +100,9 @@ module Exercise: sig
   end
 
   include module type of struct include Exercise end
-  with module Meta := Meta
-   and module Status := Status
-   and module Index := Index
+  with module Meta := Exercise.Meta
+   and module Status := Exercise.Status
+   and module Index := Exercise.Index
 
   val get: id -> t Lwt.t
 
@@ -169,7 +171,7 @@ module Student: sig
     val set: Student.t list -> unit Lwt.t
   end
 
-  include module type of struct include Student end with module Index := Index
+  include module type of struct include Student end with module Index := Student.Index
 
   val get: student token -> t option Lwt.t
 

@@ -7,17 +7,18 @@
           Server_caller
           Learnocaml_common)
  (preprocess
-  (per_module ((pps js_of_ocaml.ppx)
+  (per_module ((pps js_of_ocaml-ppx)
                Learnocaml_config
                Learnocaml_local_storage
                Server_caller)
-              ((pps ppx_ocplib_i18n js_of_ocaml.ppx)
+              ((pps ppx_ocplib_i18n js_of_ocaml-ppx)
                Learnocaml_common)))
+ (preprocessor_deps (sandbox none))
  (libraries
-    ocplib-json-typed.browser
+    json-data-encoding-browser
     js_of_ocaml
-    js_of_ocaml.ppx
-    js_of_ocaml.tyxml
+    js_of_ocaml-ppx
+    js_of_ocaml-tyxml
     jsutils
     learnocaml_toplevel
     learnocaml_repository
@@ -29,7 +30,7 @@
 
 (executable
  (name learnocaml_index_main)
- (modes byte)
+ (modes byte js)
  (flags :standard -warn-error -6-9-27-33-39)
  (libraries ezjsonm
             ace
@@ -37,19 +38,18 @@
             learnocaml_repository
             learnocaml_app_common
             learnocaml_toplevel
-            js_of_ocaml.ppx
+            js_of_ocaml-ppx
             ocplib_i18n)
- (modules Learnocaml_teacher_tab
+ (modules Learnocaml_teacher_tab_doc
+          Learnocaml_teacher_tab
           Learnocaml_index_main)
- (preprocess (pps ppx_ocplib_i18n js_of_ocaml.ppx))
- (js_of_ocaml
-  (flags :standard +cstruct/cstruct.js)
-  (javascript_files ../ace-lib/ace_bindings.js))
+ (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
 )
 
 (executable
  (name learnocaml_exercise_main)
- (modes byte)
+ (modes byte js)
  (flags :standard -warn-error -9-27-33)
  (libraries ezjsonm
             grading_jsoo
@@ -58,18 +58,16 @@
             learnocaml_repository
             learnocaml_app_common
             learnocaml_toplevel
-            js_of_ocaml.ppx
+            js_of_ocaml-ppx
             ocplib_i18n)
  (modules Learnocaml_exercise_main)
- (preprocess (pps ppx_ocplib_i18n js_of_ocaml.ppx))
- (js_of_ocaml
-  (flags :standard +cstruct/cstruct.js)
-  (javascript_files ../ace-lib/ace_bindings.js))
+ (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
 )
 
 (executable
  (name learnocaml_playground_main)
- (modes byte)
+ (modes byte js)
  (flags :standard -warn-error -9-27-33)
  (libraries ezjsonm
             ace
@@ -77,18 +75,16 @@
             learnocaml_repository
             learnocaml_app_common
             learnocaml_toplevel
-            js_of_ocaml.ppx
+            js_of_ocaml-ppx
             ocplib_i18n)
  (modules Learnocaml_playground_main)
- (preprocess (pps ppx_ocplib_i18n js_of_ocaml.ppx))
- (js_of_ocaml
-  (flags :standard +cstruct/cstruct.js)
-  (javascript_files ../ace-lib/ace_bindings.js))
+ (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
 )
 
 (executable
  (name learnocaml_student_view)
- (modes byte)
+ (modes byte js)
  (flags :standard -warn-error -9-27-33)
  (libraries ezjsonm
             grading_jsoo
@@ -96,56 +92,49 @@
             learnocaml_repository
             learnocaml_app_common
             lwt_react
-            js_of_ocaml.ppx
+            js_of_ocaml-ppx
             ocplib_i18n)
  (modules Learnocaml_student_view)
- (preprocess (pps ppx_ocplib_i18n js_of_ocaml.ppx))
- (js_of_ocaml
-  (flags :standard +cstruct/cstruct.js)
-  (javascript_files ../ace-lib/ace_bindings.js))
+ (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
 )
 
 (executable
  (name learnocaml_description_main)
- (modes byte)
+ (modes byte js)
  (flags :standard -warn-error -9-27-33)
  (libraries ezjsonm
             ace
             learnocaml_repository
             learnocaml_app_common
-            js_of_ocaml.ppx
+            js_of_ocaml-ppx
             ocplib_i18n)
  (modules Learnocaml_description_main)
- (preprocess (pps ppx_ocplib_i18n js_of_ocaml.ppx))
- (js_of_ocaml
-  (flags :standard +cstruct/cstruct.js)
-  (javascript_files ../ace-lib/ace_bindings.js))
+ (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
 )
 
 
 (executable
  (name learnocaml_partition_view)
- (modes byte)
+ (modes byte js)
  (flags :standard -warn-error -9-27-33)
- (libraries asak
-	    ezjsonm
+ (libraries ezjsonm
             grading_jsoo
             ace
             learnocaml_repository
             learnocaml_app_common
             lwt_react
-            js_of_ocaml.ppx
+            js_of_ocaml-ppx
             ocplib_i18n)
  (modules Learnocaml_partition_view)
- (preprocess (pps ppx_ocplib_i18n js_of_ocaml.ppx))
- (js_of_ocaml
-  (flags :standard +cstruct/cstruct.js)
-  (javascript_files ../ace-lib/ace_bindings.js))
+ (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
 )
 
 (executable
  (name learnocaml_lti_main)
- (modes byte)
+ (modes byte js)
  (flags :standard -warn-error -6-9-27-33-39)
  (libraries ezjsonm
             ace
@@ -153,10 +142,13 @@
             learnocaml_repository
             learnocaml_app_common
             learnocaml_toplevel
-            js_of_ocaml.ppx
-            ocplib_i18n)
+            js_of_ocaml-ppx
+            ocplib_i18n
+            js_of_ocaml-tyxml
+	    str)
  (modules Learnocaml_lti_main)
- (preprocess (pps ppx_ocplib_i18n js_of_ocaml.ppx))
+ (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
  (js_of_ocaml
   (flags :standard +cstruct/cstruct.js)
   (javascript_files ../ace-lib/ace_bindings.js))
@@ -164,14 +156,15 @@
 
 (executable
  (name learnocaml_reset_main)
- (modes byte)
+ (modes byte js)
  (flags :standard -warn-error -6-9-27-33-39)
  (libraries ace
             learnocaml_app_common
-            js_of_ocaml.ppx
+            js_of_ocaml-ppx
             ocplib_i18n)
  (modules Learnocaml_reset_main)
- (preprocess (pps ppx_ocplib_i18n js_of_ocaml.ppx))
+ (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
  (js_of_ocaml
   (flags :standard +cstruct/cstruct.js)
   (javascript_files ../ace-lib/ace_bindings.js))
@@ -179,14 +172,33 @@
 
 (executable
  (name learnocaml_upgrade_main)
- (modes byte)
+ (modes byte js)
  (flags :standard -warn-error -6-9-27-33-39)
  (libraries ace
             learnocaml_app_common
-            js_of_ocaml.ppx
-            ocplib_i18n)
+            js_of_ocaml-ppx
+            ocplib_i18n
+	    uri)
  (modules Learnocaml_upgrade_main)
- (preprocess (pps ppx_ocplib_i18n js_of_ocaml.ppx))
+ (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
+ (js_of_ocaml
+  (flags :standard +cstruct/cstruct.js)
+  (javascript_files ../ace-lib/ace_bindings.js))
+)
+
+(executable
+ (name learnocaml_redirection_main)
+ (modes byte js)
+ (flags :standard -warn-error -6-9-27-33-39)
+ (libraries ace
+            learnocaml_app_common
+            js_of_ocaml-ppx
+            ocplib_i18n
+	    js_of_ocaml-tyxml)
+ (modules Learnocaml_redirection_main)
+ (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
  (js_of_ocaml
   (flags :standard +cstruct/cstruct.js)
   (javascript_files ../ace-lib/ace_bindings.js))
@@ -194,14 +206,16 @@
 
 (executable
  (name learnocaml_validate_main)
- (modes byte)
+ (modes byte js)
  (flags :standard -warn-error -6-9-27-33-39)
  (libraries ace
             learnocaml_app_common
-            js_of_ocaml.ppx
-            ocplib_i18n)
+            js_of_ocaml-ppx
+            ocplib_i18n
+	    uri)
  (modules Learnocaml_validate_main)
- (preprocess (pps ppx_ocplib_i18n js_of_ocaml.ppx))
+ (preprocess (pps ppx_ocplib_i18n js_of_ocaml-ppx))
+ (preprocessor_deps (sandbox none))
  (js_of_ocaml
   (flags :standard +cstruct/cstruct.js)
   (javascript_files ../ace-lib/ace_bindings.js))
@@ -219,6 +233,7 @@
         (learnocaml_lti_main.bc.js as www/js/learnocaml-lti.js)
         (learnocaml_reset_main.bc.js as www/js/learnocaml-reset.js)
         (learnocaml_upgrade_main.bc.js as www/js/learnocaml-upgrade.js)
+        (learnocaml_redirection_main.bc.js as www/js/learnocaml-redirection.js)
 	(learnocaml_validate_main.bc.js as www/js/learnocaml-validate.js))
 )
 

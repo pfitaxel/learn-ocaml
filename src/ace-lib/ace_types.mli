@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -10,6 +10,7 @@ open Js_of_ocaml
 
 class type token = object
   method value : Js.js_string Js.t Js.prop
+  method _val : string Js.prop
   method _type : Js.js_string Js.t Js.prop
 end
 

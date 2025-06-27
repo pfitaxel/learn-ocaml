@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
  * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -18,6 +18,12 @@ type loc = {
 }
 
 val create_editor: Dom_html.divElement Js.t -> 'a editor
+
+val is_synchronized : 'a editor -> bool
+
+val set_synchronized : 'a editor -> unit
+
+val register_sync_observer : 'a editor -> (bool -> unit) -> unit
 
 val set_mode: 'a editor -> string -> unit
 
@@ -80,6 +86,7 @@ val set_custom_data: 'a editor -> 'a -> unit
 
 type token
 val token: type_:string -> string -> token
+val get_token_val: token -> string
 
 type 'state helpers = {
   initial_state: unit -> 'state;

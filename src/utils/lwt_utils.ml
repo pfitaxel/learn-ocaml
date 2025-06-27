@@ -1,7 +1,7 @@
 (* This file is part of Learn-OCaml.
  *
- * Copyright (C) 2019 OCaml Software Foundation.
- * Copyright (C) 2016-2018 OCamlPro.
+ * Copyright (C) 2019-2023 OCaml Software Foundation.
+ * Copyright (C) 2015-2018 OCamlPro.
  *
  * Learn-OCaml is distributed under the terms of the MIT license. See the
  * included LICENSE file for details. *)
@@ -17,17 +17,18 @@ let is_directory path =
     (fun _exn -> Lwt.return_false)
 
 let rec mkdir_p ?(perm=0o755) dir =
-  Lwt_unix.file_exists dir >>= function
-  | true ->
-      is_directory dir >>= fun is_directory ->
-      if is_directory then
+  if Sys.file_exists dir then
+      if Sys.is_directory dir then
         Lwt.return ()
       else
         Lwt.fail_with
           (Printf.sprintf "Can't create dir: file %s is in the way" dir)
-  | false ->
-      mkdir_p (Filename.dirname dir) >>= fun () ->
-      Lwt_unix.mkdir dir perm
+  else
+      if Sys.file_exists (Filename.dirname dir) then
+        Lwt.return (Unix.mkdir dir perm)
+      else
+        mkdir_p ~perm (Filename.dirname dir) >>= fun () ->
+        mkdir_p ~perm dir
 
 let copy_file src dst =
   Lwt.catch (fun () ->
@@ -47,7 +48,7 @@ let copy_tree src dst =
         mkdir_p dst >>= fun () ->
         let cmd =
           Array.concat
-            [[|"cp"; "-PR"|];
+            [[|"cp"; "-PpR"|];
              Array.map (Filename.concat src) files;
              [|dst|]]
         in
