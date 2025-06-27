@@ -11,7 +11,6 @@ RUN sudo chown -R opam:nogroup .
 
 ENV OPAMYES true
 RUN echo 'archive-mirrors: [ "https://opam.ocaml.org/cache" ]' >> ~/.opam/config \
-  && opam repository set-url default http://opam.ocaml.org \
   && opam switch 5.1 \
   && echo 'pre-session-commands: [ "sudo" "apk" "add" depexts ]' >> ~/.opam/config \
   && opam install . --deps-only --locked
