@@ -1,11 +1,13 @@
 FROM ocaml/opam:alpine-3.20-ocaml-5.1 as compilation
 LABEL Description="learn-ocaml building" Vendor="OCamlPro"
 
+RUN cd ~/opam-repository && git fetch -q origin master && git reset --hard 08d8c16c16dc6b23a5278b06dff0ac6c7a217356 && opam update
+RUN sudo ln -sf /usr/bin/opam-2.3 /usr/bin/opam && opam option solver=builtin-0install && opam init --reinit -ni
+
 WORKDIR /home/opam/learn-ocaml
 
 COPY learn-ocaml.opam learn-ocaml.opam.locked learn-ocaml-client.opam learn-ocaml-client.opam.locked ./
 RUN sudo chown -R opam:nogroup .
-RUN sudo ln -sf /usr/bin/opam-2.3 /usr/bin/opam && opam init --reinit -ni
 
 ENV OPAMYES true
 RUN echo 'archive-mirrors: [ "https://opam.ocaml.org/cache" ]' >> ~/.opam/config \
