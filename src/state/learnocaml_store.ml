@@ -286,6 +286,37 @@ module Exercise = struct
 
 end
 
+
+module LtiIndex = struct
+  open Lwt.Syntax
+
+  module Store = Irmin_git_unix.FS.KV(Irmin.Contents.Json_value)
+  module Info = Irmin_git_unix.Info(Store.Info)
+
+  let repo_path = ref "./lti_index_store.git"
+  let config () = Irmin_git.config ~bare:true !repo_path
+
+  let enc =
+    let open Json_encoding in
+    conv
+      (fun token -> token)
+      (fun token -> token)
+      Token.enc
+
+  let add id token =
+    let* repo = Store.Repo.v (config ()) in
+    let* t = Store.main repo in
+    Store.set_exn t ~info:(Info.v "Add LTI ID → Token") [id]
+      (Json_encoding.construct enc token)
+
+  let get_user_token id =
+    let* repo = Store.Repo.v (config ()) in
+    let* t = Store.main repo in
+    let+ res = Store.find t [id] in
+    Option.map (Json_encoding.destruct enc) res
+end
+
+
 module Session = struct
 
   include Session
